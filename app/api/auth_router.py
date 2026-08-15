@@ -159,7 +159,10 @@ def refresh_access_token(
     response: Response,
     db: Session = Depends(get_db)
 ):
-    """Exchange a valid refresh token for a fresh short-lived access token."""
+    """
+    Exchange a valid refresh token for a fresh short-lived access token and rotated refresh token.
+    Immediately revokes the previous refresh token JTI to prevent replay attacks.
+    """
     token = payload.refresh_token or request.cookies.get("refresh_token")
     if not token:
         raise HTTPException(
@@ -171,11 +174,16 @@ def refresh_access_token(
     if not decoded or decoded.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token. Please sign in again."
+            detail="Invalid, expired, or revoked refresh token. Please sign in again."
         )
 
     sub = decoded.get("sub")
-    session_id = decoded.get("jti")
+    old_session_id = decoded.get("jti")
+
+    # Revoke old refresh token JTI immediately
+    if old_session_id:
+        revoke_token(old_session_id)
+
     user = db.query(User).filter(User.employee_id == int(sub)).first() if sub and str(sub).isdigit() else None
 
     if not user or not user.is_active or user.is_locked:
@@ -184,10 +192,17 @@ def refresh_access_token(
             detail="User account is inactive or locked."
         )
 
+    # Issue new rotated session tokens
+    new_session_id = str(uuid.uuid4())
     new_access_token = create_access_token(
         subject=str(user.employee_id),
         role=user.role,
-        session_id=session_id
+        session_id=new_session_id
+    )
+    new_refresh_token, _ = create_refresh_token(
+        subject=str(user.employee_id),
+        role=user.role,
+        session_id=new_session_id
     )
 
     response.set_cookie(
@@ -198,10 +213,18 @@ def refresh_access_token(
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    )
 
     return {
         "access_token": new_access_token,
-        "refresh_token": token,
+        "refresh_token": new_refresh_token,
         "token_type": "bearer",
         "expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
         "user": user.to_dict()

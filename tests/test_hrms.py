@@ -272,22 +272,74 @@ def test_password_policy_and_change_flow():
 
 
 def test_token_refresh_and_revocation():
-    """Verify refresh token rotation and logout revocation."""
+    """Verify refresh token rotation (one-time use) and session revocation."""
     login_res = client.post("/api/auth/login", json={"employee_id": 9924101, "password": "admin123"})
     assert login_res.status_code == 200
     data = login_res.json()
     refresh_token = data["refresh_token"]
     assert refresh_token is not None
 
-    # Refresh access token
+    # 1. First refresh exchange succeeds and rotates refresh token
     refresh_res = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
     assert refresh_res.status_code == 200
     new_data = refresh_res.json()
     assert new_data["access_token"] is not None
+    rotated_refresh_token = new_data["refresh_token"]
+    assert rotated_refresh_token != refresh_token
 
-    # Logout and verify cookies cleared
-    logout_res = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {new_data['access_token']}"})
+    # 2. Replay attack: Old refresh token is revoked and fails with 401
+    replay_res = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    assert replay_res.status_code == 401
+    assert "revoked" in replay_res.json()["detail"].lower() or "invalid" in replay_res.json()["detail"].lower()
+
+    # 3. New rotated refresh token works
+    second_refresh = client.post("/api/auth/refresh", json={"refresh_token": rotated_refresh_token})
+    assert second_refresh.status_code == 200
+
+    # 4. Logout and verify session revocation
+    logout_res = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {second_refresh.json()['access_token']}"})
     assert logout_res.status_code == 200
+
+
+def test_payroll_state_machine_transitions():
+    """Verify strict payroll lifecycle: DRAFT -> CALCULATED -> APPROVED -> PAID."""
+    login_res = client.post("/api/auth/login", json={"employee_id": 9924101, "password": "admin123"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Generate payroll
+    pay_res = client.post("/api/payroll/generate", json={"month_year": "2026-09"}, headers=headers)
+    assert pay_res.status_code == 200
+    records = pay_res.json()
+    assert len(records) > 0
+    rec_id = records[0]["id"]
+
+    # Set to CALCULATED in DB to test state machine transitions
+    db = SessionLocal()
+    rec = db.query(PayrollRecord).filter(PayrollRecord.id == rec_id).first()
+    rec.payment_status = "CALCULATED"
+    db.commit()
+    db.close()
+
+    # 1. Approve transition: CALCULATED -> APPROVED
+    app_res = client.post(f"/api/payroll/{rec_id}/approve", json={}, headers=headers)
+    assert app_res.status_code == 200
+    assert app_res.json()["record"]["payment_status"] == "APPROVED"
+
+    # 2. Disallow duplicate approve: APPROVED cannot be approved again
+    dup_app = client.post(f"/api/payroll/{rec_id}/approve", json={}, headers=headers)
+    assert dup_app.status_code == 400
+    assert "cannot approve" in dup_app.json()["detail"].lower()
+
+    # 3. Disburse transition: APPROVED -> PAID
+    dis_res = client.post(f"/api/payroll/{rec_id}/disburse", headers=headers)
+    assert dis_res.status_code == 200
+    assert dis_res.json()["record"]["payment_status"] == "PAID"
+
+    # 4. Disallow further transitions on finalized PAID record
+    fail_dis = client.post(f"/api/payroll/{rec_id}/disburse", headers=headers)
+    assert fail_dis.status_code == 400
 
 
 def test_account_lockout_after_failed_attempts():

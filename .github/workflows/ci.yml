@@ -33,7 +33,22 @@ jobs:
         run: |
           ruff check . --ignore E501,F401,E402
 
-  # Job 2: Security & Static Vulnerability Scan
+  # Job 2: Secret Scanning (TruffleHog)
+  secret-scan:
+    name: Secret & Credential Leak Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog Secret Scanner
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --exclude-paths=.env.example,DEMO_CREDENTIALS.pdf
+
+  # Job 3: AST Security & Dependency Audit
   security-scan:
     name: AST Security & Dependency Audit
     runs-on: ubuntu-latest
@@ -60,10 +75,10 @@ jobs:
           pip install -r requirements.txt
           pip-audit || true
 
-  # Job 3: Integration Tests against Real PostgreSQL 16 & Redis 7
+  # Job 4: Integration Tests against Real PostgreSQL 16 & Redis 7
   test:
     name: Test Suite (Python ${{ matrix.python-version }})
-    needs: [lint, security-scan]
+    needs: [lint, secret-scan, security-scan]
     runs-on: ubuntu-latest
 
     services:
@@ -111,7 +126,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Integration Tests with PostgreSQL & Coverage
+      - name: Run Alembic Migrations against Real PostgreSQL
+        env:
+          DATABASE_URL: postgresql://staffsync_admin:staffsync_ci_test_password@localhost:5432/staffsync_test_db
+        run: |
+          alembic upgrade head
+
+      - name: Run Integration Tests with PostgreSQL, Redis & Coverage
         env:
           DATABASE_URL: postgresql://staffsync_admin:staffsync_ci_test_password@localhost:5432/staffsync_test_db
           REDIS_URL: redis://localhost:6379/0
@@ -120,9 +141,9 @@ jobs:
         run: |
           python -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
 
-  # Job 4: Multi-stage Docker Container Build Verification
-  docker-build:
-    name: Docker Image Build Verification
+  # Job 5: Multi-stage Docker Container Build & Trivy Vulnerability Scan
+  docker-build-and-scan:
+    name: Docker Image Build & Trivy Scan
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -138,4 +159,15 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: staffsync360:latest
+
+      - name: Run Trivy Container Security Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'staffsync360:latest'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

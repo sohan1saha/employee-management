@@ -1,13 +1,18 @@
 #!/bin/bash
 # ==============================================================================
-# StaffSync 360 - Database Restore Utility
+# StaffSync 360 - Database Restore & Decryption Script
 # ==============================================================================
 set -e
 
 BACKUP_FILE="$1"
 
-if [ -z "${BACKUP_FILE}" ] || [ ! -f "${BACKUP_FILE}" ]; then
-    echo "Usage: $0 <path_to_backup_file.sql.gz>"
+if [ -z "${BACKUP_FILE}" ]; then
+    echo "[-] Usage: $0 <path_to_backup_file.sql.gz.enc | path_to_backup_file.dump.gz>"
+    exit 1
+fi
+
+if [ ! -f "${BACKUP_FILE}" ]; then
+    echo "[-] CRITICAL ERROR: Backup file '${BACKUP_FILE}' does not exist."
     exit 1
 fi
 
@@ -16,23 +21,31 @@ if [ -z "${POSTGRES_PASSWORD}" ]; then
     exit 1
 fi
 
-echo "[!] WARNING: This will restore and overwrite the database from ${BACKUP_FILE}."
-echo "[+] Starting database restore at $(date)..."
+RESTORE_TARGET="${BACKUP_FILE}"
 
-# Decrypt if .enc
-TEMP_FILE="${BACKUP_FILE}"
+# 1. Decrypt if file ends with .enc
 if [[ "${BACKUP_FILE}" == *.enc ]]; then
     if [ -z "${ENCRYPTION_PASSPHRASE}" ]; then
-        echo "[-] Error: ENCRYPTION_PASSPHRASE required to decrypt ${BACKUP_FILE}"
+        echo "[-] CRITICAL ERROR: ENCRYPTION_PASSPHRASE is required to decrypt this backup."
         exit 1
     fi
-    TEMP_FILE="/tmp/restore_decrypted.sql.gz"
-    gpg --batch --yes --passphrase "${ENCRYPTION_PASSPHRASE}" \
-        --decrypt -o "${TEMP_FILE}" "${BACKUP_FILE}"
+    if ! command -v gpg >/dev/null 2>&1; then
+        echo "[-] CRITICAL ERROR: 'gpg' (GnuPG) binary is not installed."
+        exit 1
+    fi
+
+    DECRYPTED_PATH="/tmp/decrypted_$(basename "${BACKUP_FILE}" .enc)"
+    echo "[+] Decrypting backup file using AES-256..."
+    gpg --batch --yes --pinentry-mode loopback \
+        --passphrase "${ENCRYPTION_PASSPHRASE}" \
+        --decrypt -o "${DECRYPTED_PATH}" "${BACKUP_FILE}"
+    RESTORE_TARGET="${DECRYPTED_PATH}"
 fi
 
-# Restore PostgreSQL database
-gunzip -c "${TEMP_FILE}" | PGPASSWORD="${POSTGRES_PASSWORD}" pg_restore \
+echo "[+] Restoring PostgreSQL database from ${RESTORE_TARGET}..."
+
+# 2. Decompress and restore
+gunzip -c "${RESTORE_TARGET}" | PGPASSWORD="${POSTGRES_PASSWORD}" pg_restore \
     -h "${POSTGRES_HOST:-db}" \
     -U "${POSTGRES_USER:-staffsync_admin}" \
     -d "${POSTGRES_DB:-staffsync_db}" \
@@ -41,8 +54,9 @@ gunzip -c "${TEMP_FILE}" | PGPASSWORD="${POSTGRES_PASSWORD}" pg_restore \
     --no-owner \
     --no-privileges
 
-if [ "${TEMP_FILE}" != "${BACKUP_FILE}" ]; then
-    rm -f "${TEMP_FILE}"
+# 3. Clean temporary decrypted file
+if [[ "${BACKUP_FILE}" == *.enc ]]; then
+    rm -f "${DECRYPTED_PATH}"
 fi
 
-echo "[✓] Database restored successfully from ${BACKUP_FILE}!"
+echo "[✓] Database successfully restored from backup."

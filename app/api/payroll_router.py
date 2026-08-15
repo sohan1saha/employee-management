@@ -16,6 +16,13 @@ from app.services.cache_service import cache
 
 router = APIRouter(prefix="/payroll", tags=["Payroll & Compensation"])
 
+VALID_TRANSITIONS = {
+    "DRAFT": ["CALCULATED"],
+    "CALCULATED": ["APPROVED", "PAID"],
+    "APPROVED": ["PAID"],
+    "PAID": []  # Terminal state (Immutable)
+}
+
 
 @router.post("/generate", response_model=List[dict])
 def trigger_payroll_generation(
@@ -49,7 +56,7 @@ def approve_payroll_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN", "MANAGER"]))
 ):
-    """Formally approve a payroll record."""
+    """Formally approve a calculated payroll record."""
     req_id = get_request_id(request)
     client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("User-Agent", "Unknown")
@@ -61,6 +68,13 @@ def approve_payroll_record(
             detail="Payroll record not found."
         )
 
+    # State Machine Check
+    if record.payment_status not in ["DRAFT", "CALCULATED"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid transition. Cannot approve record already in '{record.payment_status}' status."
+        )
+
     scoped_center = get_user_scope_center(db, current_user)
     if scoped_center and record.employee.ecen != scoped_center:
         raise HTTPException(
@@ -68,7 +82,8 @@ def approve_payroll_record(
             detail=f"Access denied. You can only approve payroll for employees in the '{scoped_center}' branch."
         )
 
-    record.payment_status = "PAID"
+    old_status = record.payment_status
+    record.payment_status = "APPROVED"
     record.approved_by = current_user.id
     record.approved_at = datetime.now(timezone.utc)
     db.commit()
@@ -80,13 +95,58 @@ def approve_payroll_record(
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
         role=current_user.role,
-        new_value=f"Approved by #{current_user.employee_id}, Amount: ₹{record.net_salary}",
+        old_value=f"Status: {old_status}",
+        new_value=f"Status: APPROVED, Approver: #{current_user.employee_id}, Amount: ₹{record.net_salary}",
         client_ip=client_ip,
         user_agent=user_agent,
         request_id=req_id
     )
 
     return {"message": f"Payroll record #{record_id} approved and finalized.", "record": record.to_dict()}
+
+
+@router.post("/{record_id}/disburse")
+def disburse_payroll_record(
+    record_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["ADMIN"]))
+):
+    """Mark an approved payroll record as PAID (Disbursed)."""
+    req_id = get_request_id(request)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent", "Unknown")
+
+    record = db.query(PayrollRecord).filter(PayrollRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll record not found."
+        )
+
+    if record.payment_status not in ["APPROVED", "CALCULATED"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid transition. Cannot disburse payroll in '{record.payment_status}' status."
+        )
+
+    record.payment_status = "PAID"
+    db.commit()
+
+    record_audit(
+        db=db,
+        action="PAYROLL_DISBURSED",
+        target_entity=f"Payroll #{record.id} (Emp #{record.employee_id})",
+        user_id=current_user.id,
+        username=f"#{current_user.employee_id}",
+        role=current_user.role,
+        new_value=f"Status: PAID, Amount: ₹{record.net_salary}",
+        client_ip=client_ip,
+        user_agent=user_agent,
+        request_id=req_id
+    )
+
+    return {"message": f"Payroll record #{record_id} marked as PAID.", "record": record.to_dict()}
 
 
 @router.get("", response_model=List[dict])

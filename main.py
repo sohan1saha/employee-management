@@ -31,8 +31,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("staffsync.main")
 
-# Auto-create all tables in SQLite/configured database
-Base.metadata.create_all(bind=engine)
+# Database Initialization: Only auto-create tables in development SQLite mode
+# In production, database schema must be applied via Alembic migrations (`alembic upgrade head`)
+if settings.ENVIRONMENT != "production" and settings.DATABASE_URL.startswith("sqlite"):
+    Base.metadata.create_all(bind=engine)
+else:
+    logger.info("Production/External Database mode: Schema management delegated to Alembic migrations.")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

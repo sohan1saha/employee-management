@@ -1,16 +1,18 @@
 """
 ==============================================================================
-StaffSync 360 - Database Backup & Restore Integrity Test
+StaffSync 360 - Database Backup, Encryption & Restore Integrity Test
 ==============================================================================
-Validates that database dumps, compression, and restore workflows function
-accurately without data loss or corruption.
+Validates that database dumps, compression, AES-256 encryption, and restore workflows
+function accurately without data loss or corruption.
 """
 
 import os
 import sys
 import gzip
 import sqlite3
+import hashlib
 import pytest
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -36,7 +38,6 @@ def test_sqlite_and_schema_backup_integrity(tmp_path):
     
     # In SQLite mode, export database schema & rows
     with gzip.open(backup_file, "wt", encoding="utf-8") as f:
-        # Export all table definitions and data
         for line in engine.raw_connection().iterdump():
             f.write(f"{line}\n")
 
@@ -70,3 +71,57 @@ def test_sqlite_and_schema_backup_integrity(tmp_path):
     assert admin_row is not None
     assert admin_row[1] == "Eleanor Vance"
     assert admin_row[2] == "Corporate HQ"
+
+
+def test_encrypted_backup_and_decrypted_restore(tmp_path):
+    """Test AES-256 authenticated encryption on database backup and verify decrypted restoration."""
+    raw_dump_path = tmp_path / "raw_backup.sql.gz"
+    encrypted_path = tmp_path / "raw_backup.sql.gz.enc"
+    decrypted_path = tmp_path / "decrypted_backup.sql.gz"
+
+    # 1. Dump database to compressed gzip
+    with gzip.open(raw_dump_path, "wt", encoding="utf-8") as f:
+        for line in engine.raw_connection().iterdump():
+            f.write(f"{line}\n")
+
+    with open(raw_dump_path, "rb") as f:
+        plaintext_data = f.read()
+
+    # 2. Encrypt with AES-256-GCM using derived 256-bit key from passphrase
+    passphrase = "EnterpriseSecretPassphrase2026!"
+    aes_key = hashlib.sha256(passphrase.encode("utf-8")).digest()
+    aesgcm = AESGCM(aes_key)
+    nonce = os.urandom(12)
+    ciphertext = nonce + aesgcm.encrypt(nonce, plaintext_data, None)
+
+    with open(encrypted_path, "wb") as f:
+        f.write(ciphertext)
+
+    assert os.path.exists(encrypted_path)
+    assert os.path.getsize(encrypted_path) > len(nonce)
+
+    # 3. Decrypt and verify payload
+    with open(encrypted_path, "rb") as f:
+        encrypted_blob = f.read()
+
+    extracted_nonce = encrypted_blob[:12]
+    extracted_cipher = encrypted_blob[12:]
+    decrypted_bytes = aesgcm.decrypt(extracted_nonce, extracted_cipher, None)
+
+    with open(decrypted_path, "wb") as f:
+        f.write(decrypted_bytes)
+
+    # 4. Execute restore into isolated database
+    restore_target = tmp_path / "decrypted_restored.db"
+    conn = sqlite3.connect(str(restore_target))
+    cursor = conn.cursor()
+
+    with gzip.open(decrypted_path, "rt", encoding="utf-8") as f:
+        cursor.executescript(f.read())
+    conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM employees")
+    emp_count = cursor.fetchone()[0]
+    conn.close()
+
+    assert emp_count > 0

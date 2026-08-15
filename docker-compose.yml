@@ -95,14 +95,17 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be configured in .env}
       POSTGRES_DB: ${POSTGRES_DB:-staffsync_db}
       RETENTION_DAYS: 7
-      ENCRYPTION_PASSPHRASE: ${ENCRYPTION_PASSPHRASE:-}
+      ENCRYPTION_PASSPHRASE: ${ENCRYPTION_PASSPHRASE:?ENCRYPTION_PASSPHRASE must be configured in .env}
+      S3_BUCKET: ${S3_BUCKET:-}
+      REMOTE_BACKUP_URL: ${REMOTE_BACKUP_URL:-}
     volumes:
       - ./scripts/backup_db.sh:/usr/local/bin/backup_db.sh:ro
       - backups_data:/backups
     entrypoint: |
       /bin/sh -c '
-        echo "0 2 * * * /bin/sh /usr/local/bin/backup_db.sh" > /etc/crontabs/root
-        echo "[+] Automated backup daemon started. Running daily at 02:00 AM UTC."
+        apk add --no-cache bash gnupg curl
+        echo "0 2 * * * /bin/bash /usr/local/bin/backup_db.sh" > /etc/crontabs/root
+        echo "[+] Automated backup daemon started with mandatory GPG encryption. Running daily at 02:00 AM UTC."
         crond -f -l 2
       '
     depends_on:

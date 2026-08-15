@@ -263,10 +263,11 @@ All protected endpoints require a Bearer token: `Authorization: Bearer <access_t
 
 | Method | Endpoint | Access Role | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | Public | Authenticate via numeric **Employee ID** and password. Returns JWT token. |
+| `POST` | `/api/auth/login` | Public | Authenticate via numeric **Employee ID** and password. Includes 5-attempt brute-force lockout (15m). |
+| `POST` | `/api/auth/refresh` | Public / Cookie | Rotate refresh token and issue new 15-minute access token + rotated refresh token. Revokes previous JTI. |
 | `GET` | `/api/auth/me` | Authenticated | Retrieve authenticated user profile and linked employee metadata. |
-| `POST` | `/api/auth/change-password` | Authenticated | Self-service password update (requires `old_password`, `new_password`, `confirm_password`). |
-| `POST` | `/api/auth/logout` | Authenticated | Invalidate and clear session cookie. |
+| `POST` | `/api/auth/change-password` | Authenticated | Self-service password update with complexity policy validation. |
+| `POST` | `/api/auth/logout` | Authenticated | Revoke session and clear HttpOnly secure cookies. |
 
 ---
 
@@ -275,12 +276,12 @@ All protected endpoints require a Bearer token: `Authorization: Bearer <access_t
 | Method | Endpoint | Access Role | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/employees` | Authenticated | List employees with optional filters (`search`, `center`, `status`). Scoped for managers & employees. |
-| `GET` | `/api/employees/{eid}` | Authenticated | Retrieve individual employee record (scoped by center / self). |
+| `GET` | `/api/employees/{eid}` | Authenticated | Retrieve individual employee record (scoped by center / self with IDOR protection). |
 | `GET` | `/api/employees/next-id` | `ADMIN`, `MANAGER` | Get auto-recommended continuous Employee ID based on `center` and `doj`. |
 | `GET` | `/api/employees/centers/list` | Authenticated | Get list of centers accessible to current user. |
-| `POST` | `/api/employees` | `ADMIN`, `MANAGER` | Register new employee. Center managers restricted to their assigned center. |
+| `POST` | `/api/employees` | `ADMIN`, `MANAGER` | Register new employee with atomic concurrency sequence allocation. |
 | `PUT` | `/api/employees/{eid}` | `ADMIN`, `MANAGER` | Update employee designation, center, salary, or status. Logs audit entry. |
-| `DELETE`| `/api/employees/{eid}` | `ADMIN` | Permanently delete employee and cascade linked records. |
+| `DELETE`| `/api/employees/{eid}` | `ADMIN` | Soft-delete / deactivate employee (sets status to `TERMINATED`, revokes login, preserves payroll/audit history). |
 
 ---
 
@@ -288,7 +289,9 @@ All protected endpoints require a Bearer token: `Authorization: Bearer <access_t
 
 | Method | Endpoint | Access Role | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/payroll/generate` | `ADMIN` | Batch compute payroll and generate records for a specific month and center. |
+| `POST` | `/api/payroll/generate` | `ADMIN` | Batch compute payroll with high-precision `Decimal` math for a specific month and center. |
+| `POST` | `/api/payroll/{id}/approve` | `ADMIN`, `MANAGER` | Formally approve a calculated payroll record (`CALCULATED` $\rightarrow$ `APPROVED`). |
+| `POST` | `/api/payroll/{id}/disburse` | `ADMIN` | Mark approved record as paid/disbursed (`APPROVED` $\rightarrow$ `PAID`). |
 | `GET` | `/api/payroll` | Authenticated | List payroll history (Admin sees all; Manager sees center; Employee sees self). |
 | `GET` | `/api/payroll/payslip/{id}/pdf` | Authenticated | Stream and download custom corporate PDF payslip with Unicode font rendering. |
 
@@ -402,19 +405,19 @@ alembic revision --autogenerate -m "add_custom_fields"
 
 ## 🧪 Running Automated Tests & Security Audits
 
-### 1. Pytest Integration Suite & Coverage (16 Test Suites)
+### 1. Pytest Integration Suite & Coverage (18 Test Suites)
 ```bash
 pytest tests/ -v --cov=app --cov-report=term-missing
 ```
 
-The 16 test suites validate:
-* **Authentication & Tokens:** 15m JWT lifetime, 7d refresh token rotation, session revocation, brute-force lockout (5 attempts $\rightarrow$ 15m).
+The 18 test suites validate:
+* **Authentication & Tokens:** 15m JWT lifetime, 7d refresh token rotation, replay attack prevention, session revocation, brute-force lockout (5 attempts $\rightarrow$ 15m).
 * **Cryptographic & Password Policies:** Password complexity enforcement and missing production secret startup crash protection.
-* **Financial Precision & Immutability:** Pure Decimal salary calculations and ORM-level modification/deletion rejection for paid payroll records.
+* **Financial Precision & Immutability:** Pure Decimal salary calculations, strict lifecycle state transitions (`DRAFT` $\rightarrow$ `CALCULATED` $\rightarrow$ `APPROVED` $\rightarrow$ `PAID`), and ORM-level modification/deletion rejection for paid payroll records.
 * **Audit Trail Integrity:** Immutable append-only audit log enforcement via SQLAlchemy event listeners.
-* **Concurrency & ID Allocation:** Multi-threaded stress testing proving atomic, collision-free sequential employee ID generation.
+* **Concurrency & ID Allocation:** Multi-threaded stress testing proving atomic, collision-free sequential employee ID generation with row locks.
 * **Multi-Tenant Scoping:** Cross-center access boundaries and IDOR object-level protection.
-* **Disaster Recovery & Data Protection:** Automated PostgreSQL/SQLite dump, compression, and restore verification tests.
+* **Disaster Recovery & Data Protection:** Automated PostgreSQL/SQLite dump, gzip compression, AES-256 authenticated encryption, and complete restore integrity tests.
 
 ### 2. AST Security Vulnerability Scan (Bandit)
 ```bash
