@@ -2,13 +2,15 @@ import sys
 import os
 import argparse
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, get_db
 import app.models  # Ensures all models are registered with Base metadata
 from app.api.auth_router import router as auth_router
 from app.api.employee_router import router as employee_router
@@ -16,6 +18,7 @@ from app.api.payroll_router import router as payroll_router
 from app.api.leave_router import router as leave_router
 from app.api.analytics_router import router as analytics_router
 from app.api.audit_router import router as audit_router
+from app.services.cache_service import cache
 from app.core.emp_mgmt_core import cli_menu
 
 # Auto-create all tables in SQLite/configured database
@@ -24,7 +27,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Enterprise HRMS, Payroll Engine, and Audit Logging Platform",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 # CORS middleware for open development access
@@ -43,6 +46,42 @@ app.include_router(payroll_router, prefix=settings.API_V1_STR)
 app.include_router(leave_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
+
+
+# =============================================================================
+# Production Health Check & Monitoring Endpoints
+# =============================================================================
+@app.get("/healthz", tags=["System Health"])
+def health_check():
+    """Lightweight health probe for Docker, Kubernetes, and Load Balancers."""
+    return {"status": "ok", "service": "staffsync-api", "version": "1.1.0"}
+
+
+@app.get("/api/system/health", tags=["System Health"])
+def system_health_status(db: Session = Depends(get_db)):
+    """Deep system diagnostic report checking Database and Cache layers."""
+    db_status = "healthy"
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+
+    cache_status = "connected (redis)" if cache.is_redis_available else "fallback (in-memory lru)"
+
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "service": settings.PROJECT_NAME,
+        "version": "1.1.0",
+        "database": {
+            "dialect": engine.dialect.name,
+            "status": db_status
+        },
+        "cache": {
+            "type": cache_status,
+            "status": "operational"
+        }
+    }
+
 
 # Serve Web Dashboard static assets
 web_dir = os.path.join(os.path.dirname(__file__), "app", "web")

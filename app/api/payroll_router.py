@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.payroll_schema import PayrollGenerateRequest, PayrollResponse
 from app.api.deps import get_current_user, require_roles, get_user_scope_center
 from app.services.payroll_service import generate_payroll_for_month, generate_payslip_pdf
+from app.services.cache_service import cache
 
 router = APIRouter(prefix="/payroll", tags=["Payroll & Compensation"])
 
@@ -28,6 +29,7 @@ def trigger_payroll_generation(
         center=payload.center,
         current_user=user_dict
     )
+    cache.invalidate_prefix("analytics:")
     return [r.to_dict() for r in records]
 
 

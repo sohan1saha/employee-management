@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.env.local
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.coverage
+htmlcov
+staffsync.db
+*.sqlite3
+*.log
+.vscode
+.idea
+docs/assets/*.jpg
+tests/

@@ -339,6 +339,33 @@ def test_change_password_flow():
     assert revert_res.status_code == 200
 
 
+def test_system_health_and_caching_layer():
+    """Verify healthcheck endpoints, DB connectivity diagnostics, and cache service."""
+    from app.services.cache_service import cache
+
+    # 1. Test /healthz
+    res = client.get("/healthz")
+    assert res.status_code == 200
+    assert res.json()["status"] == "ok"
+
+    # 2. Test /api/system/health
+    res_sys = client.get("/api/system/health")
+    assert res_sys.status_code == 200
+    data = res_sys.json()
+    assert data["status"] == "healthy"
+    assert "database" in data
+    assert "cache" in data
+
+    # 3. Test Cache Service get/set/invalidate
+    cache.set("test_key_emp", {"emp_count": 42}, ttl_seconds=60)
+    cached_val = cache.get("test_key_emp")
+    assert cached_val == {"emp_count": 42}
+
+    cache.invalidate_prefix("test_key")
+    assert cache.get("test_key_emp") is None
+
+
+
 
 
 

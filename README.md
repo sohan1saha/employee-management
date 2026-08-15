@@ -356,7 +356,18 @@ python seed_data.py
 
 ## 💻 Running the Application
 
-### Option A: Launch Web Dashboard & REST API *(Recommended)*
+### Option A: 1-Click Production Docker Compose *(Recommended for Deployment)*
+```bash
+# Starts FastAPI App, PostgreSQL 16, Redis 7, and NGINX Reverse Proxy
+docker compose up -d --build
+```
+* 🌐 **Production Web Application:** [http://localhost](http://localhost)
+* 📊 **Health Check Probe:** [http://localhost/healthz](http://localhost/healthz)
+* 🩺 **Deep Diagnostic Report:** [http://localhost/api/system/health](http://localhost/api/system/health)
+
+---
+
+### Option B: Local Python Development Server
 ```bash
 python main.py
 # or
@@ -366,16 +377,32 @@ python main.py --web
 * 📖 **Interactive Swagger Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * 📑 **Alternative Redoc Docs:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
-### Option B: Interactive Terminal CLI Mode *(Original Script Evolution)*
+---
+
+### Option C: Interactive Terminal CLI Mode *(Original Script Evolution)*
 ```bash
 python main.py --cli
 ```
 
 ---
 
+## 🗄 Database Migrations (Alembic)
+
+StaffSync 360 uses version-controlled database schema migrations:
+
+```bash
+# Run latest database migrations
+alembic upgrade head
+
+# Create a new automated migration after modifying models
+alembic revision --autogenerate -m "add_custom_fields"
+```
+
+---
+
 ## 🧪 Running Automated Tests
 
-Execute the full integration test suite with:
+Execute the full 10-suite integration test suite with:
 ```bash
 pytest tests/test_hrms.py -v
 ```

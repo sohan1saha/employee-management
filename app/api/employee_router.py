@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.employee_schema import EmployeeCreate, EmployeeUpdate, EmployeeResponse
 from app.api.deps import get_current_user, require_roles, get_user_scope_center
 from app.services.audit_service import record_audit
+from app.services.cache_service import cache
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -233,6 +234,9 @@ def create_employee(
         client_ip=client_ip
     )
 
+    # Invalidate cached analytics
+    cache.invalidate_prefix("analytics:")
+
     return employee.to_dict()
 
 
@@ -292,6 +296,7 @@ def update_employee(
             new_value=", ".join(changes_new),
             client_ip=client_ip
         )
+        cache.invalidate_prefix("analytics:")
 
     return emp.to_dict()
 
@@ -326,5 +331,7 @@ def delete_employee(
         old_value=emp_snapshot,
         client_ip=client_ip
     )
+
+    cache.invalidate_prefix("analytics:")
 
     return {"message": f"Employee record #{eid} successfully deleted"}
