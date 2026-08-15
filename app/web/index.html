@@ -127,53 +127,140 @@
           
           <!-- ADMIN & MANAGER DASHBOARD -->
           <div id="dashboard-admin-view">
+            <!-- Dashboard Utilities Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h2 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin: 0;">Workforce Intelligence & Operations</h2>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 3px 0 0 0;">Real-time headcount, financial burn rate, compensation metrics, and attendance tracking.</p>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="app.openSalaryCalculatorModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>🧮</span> Salary Breakdown Tool
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="app.exportRosterCSV()" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>📥</span> Export Roster CSV
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="app.loadDashboardAnalytics()" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>🔄</span> Refresh Stream
+                </button>
+              </div>
+            </div>
+
             <!-- KPI Summary Cards -->
             <div class="kpi-grid">
               <div class="kpi-card">
                 <div>
                   <div class="kpi-label">Active Headcount</div>
                   <div class="kpi-value" id="kpi-headcount">0</div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;" id="kpi-headcount-sub">On Leave: 0</div>
                 </div>
               </div>
               <div class="kpi-card">
                 <div>
-                  <div class="kpi-label">Monthly Payroll</div>
+                  <div class="kpi-label">Monthly Payroll Burn</div>
                   <div class="kpi-value" id="kpi-payroll">₹0</div>
+                  <div style="font-size: 0.76rem; color: #34d399; margin-top: 4px;" id="kpi-payroll-sub">Statutory math verified</div>
                 </div>
               </div>
               <div class="kpi-card">
                 <div>
                   <div class="kpi-label">Operating Centers</div>
                   <div class="kpi-value" id="kpi-centers">0</div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;">Regional branches</div>
                 </div>
               </div>
               <div class="kpi-card">
                 <div>
                   <div class="kpi-label">Pending Leaves</div>
                   <div class="kpi-value" id="kpi-pending-leaves">0</div>
+                  <div style="font-size: 0.76rem; color: #f59e0b; margin-top: 4px;">Action required</div>
                 </div>
               </div>
             </div>
 
-            <!-- Analytics Charts -->
+            <!-- Visual Analytics Grid: Row 1 -->
             <div class="charts-grid" style="margin-top: 24px;">
               <div class="card">
                 <div class="card-header">
-                  <h3 class="card-title">Center-wise Distribution & Budget</h3>
+                  <h3 class="card-title">📈 6-Month Monthly Payroll Payout Trend</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-payroll-trend"></canvas>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">🏢 Center Headcount & Budget Allocation</h3>
                 </div>
                 <div class="chart-container">
                   <canvas id="chart-centers"></canvas>
                 </div>
               </div>
+            </div>
+
+            <!-- Visual Analytics Grid: Row 2 -->
+            <div class="charts-grid" style="margin-top: 24px;">
               <div class="card">
                 <div class="card-header">
-                  <h3 class="card-title">Position & Role Breakdown</h3>
+                  <h3 class="card-title">💼 Role & Job Position Distribution</h3>
                 </div>
                 <div class="chart-container">
                   <canvas id="chart-positions"></canvas>
                 </div>
               </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">💰 Salary Bracket & Compensation Spread</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-salary-bands"></canvas>
+                </div>
+              </div>
             </div>
+
+            <!-- Visual Analytics Grid: Row 3 (Leave Distribution & Tenure) -->
+            <div class="charts-grid" style="margin-top: 24px;">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">🏖️ Leave Applications by Type</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-leave-types"></canvas>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">⏳ Workforce Tenure & Retention Profile</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-tenure"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center Performance & Regional Budget Matrix Table -->
+            <div class="card" style="margin-top: 24px;">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="card-title">🌐 Regional Center Financial & Headcount Matrix</h3>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Branch Center</th>
+                      <th>Active Headcount</th>
+                      <th>Average Monthly Salary</th>
+                      <th>Total Monthly Budget</th>
+                      <th>Allocation %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="center-matrix-table-body">
+                    <!-- Rendered via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
 
           <!-- EMPLOYEE SELF-SERVICE WORKSPACE -->
@@ -690,6 +777,65 @@
         <button type="button" class="btn btn-primary" id="btn-confirm-proceed" onclick="app.executeConfirmAction()" style="min-width: 110px;">
           Proceed
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Salary & CTC Calculator Utility Modal -->
+  <div id="modal-salary-calculator" class="modal-overlay">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🧮 Interactive Salary & Tax Calculator</h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <div style="padding-top: 10px;">
+        <div class="form-group">
+          <label class="form-label" for="calc-gross-salary">Enter Monthly Gross Salary (₹ INR)</label>
+          <div style="position: relative;">
+            <input type="number" id="calc-gross-salary" class="form-input" value="100000" min="10000" step="1000" oninput="app.calculateDynamicSalaryBreakdown()" placeholder="e.g. 100000">
+            <span style="position: absolute; right: 12px; top: 10px; color: var(--text-muted); font-size: 0.85rem;">/ Month</span>
+          </div>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <div class="salary-breakdown-list">
+            <div class="breakdown-row">
+              <span class="breakdown-label">Basic Salary (50%)</span>
+              <strong id="calc-res-basic" class="breakdown-val" style="color: #60a5fa;">₹50,000</strong>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">House Rent Allowance HRA (20%)</span>
+              <strong id="calc-res-hra" class="breakdown-val">₹20,000</strong>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Special Allowance (30%)</span>
+              <strong id="calc-res-allowance" class="breakdown-val">₹30,000</strong>
+            </div>
+            <div class="breakdown-divider"></div>
+            <div class="breakdown-row" style="color: #f87171;">
+              <span class="breakdown-label">Provident Fund (12% of Basic)</span>
+              <strong id="calc-res-pf" class="breakdown-val">-₹6,000</strong>
+            </div>
+            <div class="breakdown-row" style="color: #f87171;">
+              <span class="breakdown-label">Estimated Income Tax (TDS)</span>
+              <strong id="calc-res-tax" class="breakdown-val">-₹5,000</strong>
+            </div>
+            <div class="breakdown-divider"></div>
+            <div class="breakdown-row" style="font-size: 1.15rem; color: #34d399;">
+              <span>Net In-Hand Pay</span>
+              <strong id="calc-res-net">₹89,000</strong>
+            </div>
+            <div class="breakdown-row" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;">
+              <span>Annual Equivalent (CTC)</span>
+              <strong id="calc-res-annual">₹12,00,000 / yr</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="app.copySalaryBreakdownToClipboard()">📋 Copy Breakdown</button>
+          <button type="button" class="btn btn-primary" onclick="app.closeModals()">Done</button>
+        </div>
       </div>
     </div>
   </div>

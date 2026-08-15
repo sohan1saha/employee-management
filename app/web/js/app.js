@@ -308,19 +308,92 @@ class AppController {
 
       const kpis = data.kpis;
       document.getElementById('kpi-headcount').innerText = kpis.active_employees;
+      document.getElementById('kpi-headcount-sub').innerText = `On Leave: ${kpis.on_leave_employees || 0} | Deactivated: ${kpis.terminated_employees || 0}`;
       document.getElementById('kpi-payroll').innerText = `₹${(kpis.monthly_payroll_burn).toLocaleString('en-IN')}`;
       document.getElementById('kpi-centers').innerText = kpis.total_centers;
       document.getElementById('kpi-pending-leaves').innerText = kpis.pending_leaves;
 
+      // Render All 6 Interactive Visualizations
+      this.renderPayrollTrendChart(data.payroll_trends);
       this.renderCentersChart(data.center_distribution);
       this.renderPositionsChart(data.position_distribution);
+      this.renderSalaryBandsChart(data.salary_distribution);
+      this.renderLeaveTypesChart(data.leave_distribution);
+      this.renderTenureChart(data.tenure_distribution);
+
+      // Render Regional Matrix Table
+      this.renderCenterMatrixTable(data.center_distribution, kpis.monthly_payroll_burn);
     } catch (err) {
       this.showToast('Failed to load analytics', 'error');
     }
   }
 
+  renderPayrollTrendChart(data) {
+    if (!data) return;
+    const ctx = document.getElementById('chart-payroll-trend')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = data.map(d => d.month);
+    const netPayouts = data.map(d => d.net_payout);
+    const grossPayouts = data.map(d => d.gross_payout);
+
+    if (this.payrollTrendChart) this.payrollTrendChart.destroy();
+
+    this.payrollTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Gross Payroll (₹)',
+            data: grossPayouts,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#6366f1',
+            pointRadius: 4
+          },
+          {
+            label: 'Net Take-Home Disbursed (₹)',
+            data: netPayouts,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#10b981',
+            pointRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: '#9ca3af', boxWidth: 12 }
+          }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+          y: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: {
+              color: '#9ca3af',
+              callback: val => `₹${(val / 1000).toFixed(0)}k`
+            }
+          }
+        }
+      }
+    });
+  }
+
   renderCentersChart(data) {
-    const ctx = document.getElementById('chart-centers').getContext('2d');
+    if (!data) return;
+    const ctx = document.getElementById('chart-centers')?.getContext('2d');
+    if (!ctx) return;
+
     const labels = data.map(d => d.center);
     const headcounts = data.map(d => d.headcount);
 
@@ -331,9 +404,9 @@ class AppController {
       data: {
         labels: labels,
         datasets: [{
-          label: 'Employee Count',
+          label: 'Active Headcount',
           data: headcounts,
-          backgroundColor: 'rgba(99, 102, 241, 0.7)',
+          backgroundColor: 'rgba(99, 102, 241, 0.75)',
           borderColor: '#6366f1',
           borderWidth: 1,
           borderRadius: 6
@@ -354,7 +427,10 @@ class AppController {
   }
 
   renderPositionsChart(data) {
-    const ctx = document.getElementById('chart-positions').getContext('2d');
+    if (!data) return;
+    const ctx = document.getElementById('chart-positions')?.getContext('2d');
+    if (!ctx) return;
+
     const labels = data.map(d => d.position);
     const counts = data.map(d => d.count);
 
@@ -367,7 +443,7 @@ class AppController {
         datasets: [{
           data: counts,
           backgroundColor: [
-            '#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'
+            '#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6'
           ],
           borderWidth: 0
         }]
@@ -383,6 +459,239 @@ class AppController {
         }
       }
     });
+  }
+
+  renderSalaryBandsChart(data) {
+    if (!data) return;
+    const ctx = document.getElementById('chart-salary-bands')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = data.map(d => d.bracket);
+    const counts = data.map(d => d.count);
+
+    if (this.salaryBandsChart) this.salaryBandsChart.destroy();
+
+    this.salaryBandsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Employees in Bracket',
+          data: counts,
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.75)',
+            'rgba(16, 185, 129, 0.75)',
+            'rgba(245, 158, 11, 0.75)',
+            'rgba(139, 92, 246, 0.75)'
+          ],
+          borderWidth: 0,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af', precision: 0 } },
+          y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } }
+        }
+      }
+    });
+  }
+
+  renderLeaveTypesChart(data) {
+    if (!data) return;
+    const ctx = document.getElementById('chart-leave-types')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = data.map(d => d.type);
+    const counts = data.map(d => d.count);
+
+    if (this.leaveTypesChart) this.leaveTypesChart.destroy();
+
+    this.leaveTypesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: counts.length > 0 && counts.some(c => c > 0) ? counts : [1],
+          backgroundColor: [
+            '#3b82f6', '#ef4444', '#10b981', '#6b7280'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#9ca3af', boxWidth: 12 }
+          }
+        }
+      }
+    });
+  }
+
+  renderTenureChart(data) {
+    if (!data) return;
+    const ctx = document.getElementById('chart-tenure')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = data.map(d => d.tenure);
+    const counts = data.map(d => d.count);
+
+    if (this.tenureChart) this.tenureChart.destroy();
+
+    this.tenureChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: [
+            '#06b6d4', '#8b5cf6', '#f59e0b'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#9ca3af', boxWidth: 12 }
+          }
+        }
+      }
+    });
+  }
+
+  renderCenterMatrixTable(centers, totalBurn) {
+    const tbody = document.getElementById('center-matrix-table-body');
+    if (!tbody || !centers) return;
+
+    if (centers.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:16px;">No regional centers found.</td></tr>`;
+      return;
+    }
+
+    const burn = totalBurn > 0 ? totalBurn : centers.reduce((acc, c) => acc + c.total_payroll, 0);
+
+    tbody.innerHTML = centers.map(c => {
+      const pct = burn > 0 ? ((c.total_payroll / burn) * 100).toFixed(1) : 0;
+      return `
+        <tr>
+          <td><strong style="color: var(--primary);">${c.center}</strong></td>
+          <td><b>${c.headcount}</b> staff</td>
+          <td>₹${c.avg_salary.toLocaleString('en-IN')}</td>
+          <td><strong style="color: var(--success);">₹${c.total_payroll.toLocaleString('en-IN')}</strong></td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex: 1; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="background: var(--primary); height: 100%; width: ${pct}%;"></div>
+              </div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); min-width: 38px;">${pct}%</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // =========================================================================
+  // Salary Calculator & Export Utilities
+  // =========================================================================
+  openSalaryCalculatorModal() {
+    document.getElementById('modal-salary-calculator').classList.add('active');
+    this.calculateDynamicSalaryBreakdown();
+  }
+
+  calculateDynamicSalaryBreakdown() {
+    const gross = parseFloat(document.getElementById('calc-gross-salary').value) || 0;
+    const basic = gross * 0.50;
+    const hra = gross * 0.20;
+    const allowance = gross * 0.30;
+    const pf = basic * 0.12;
+
+    // Progressive income tax estimation
+    let tax = 0;
+    if (gross > 125000) {
+      tax = gross * 0.10;
+    } else if (gross > 75000) {
+      tax = gross * 0.05;
+    } else if (gross > 50000) {
+      tax = gross * 0.02;
+    }
+
+    const net = Math.max(0, gross - (pf + tax));
+    const annual = gross * 12;
+
+    document.getElementById('calc-res-basic').innerText = `₹${basic.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-hra').innerText = `₹${hra.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-allowance').innerText = `₹${allowance.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-pf').innerText = `-₹${pf.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-tax').innerText = `-₹${tax.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-net').innerText = `₹${net.toLocaleString('en-IN')}`;
+    document.getElementById('calc-res-annual').innerText = `₹${annual.toLocaleString('en-IN')} / yr`;
+  }
+
+  copySalaryBreakdownToClipboard() {
+    const gross = parseFloat(document.getElementById('calc-gross-salary').value) || 0;
+    const basic = gross * 0.50;
+    const hra = gross * 0.20;
+    const allowance = gross * 0.30;
+    const pf = basic * 0.12;
+    const net = document.getElementById('calc-res-net').innerText;
+
+    const text = `StaffSync 360 - Compensation Breakdown:\n` +
+      `Gross Salary: ₹${gross.toLocaleString('en-IN')}/mo\n` +
+      `Basic Pay (50%): ₹${basic.toLocaleString('en-IN')}\n` +
+      `HRA (20%): ₹${hra.toLocaleString('en-IN')}\n` +
+      `Special Allowance (30%): ₹${allowance.toLocaleString('en-IN')}\n` +
+      `PF (12%): -₹${pf.toLocaleString('en-IN')}\n` +
+      `Net In-Hand Pay: ${net}\n` +
+      `Annual CTC: ₹${(gross * 12).toLocaleString('en-IN')}/yr`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      this.showToast('Compensation breakdown copied to clipboard!', 'info');
+    }).catch(() => {
+      this.showToast('Copied to clipboard', 'info');
+    });
+  }
+
+  async exportRosterCSV() {
+    try {
+      this.showToast('Generating workforce roster export...', 'info');
+      const employees = await api.getEmployees({ status: "ALL", page_size: 100 });
+      if (!employees || employees.length === 0) {
+        this.showToast('No employee records found to export', 'error');
+        return;
+      }
+
+      let csv = "Employee ID,Name,Center,Position,Monthly Gross (INR),Joining Date,Status,Email\n";
+      employees.forEach(e => {
+        csv += `"${e.eid}","${e.ename}","${e.ecen}","${e.epos}","${e.esal}","${e.edoj}","${e.status}","${e.email}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `StaffSync_Workforce_Roster_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      this.showToast('Workforce CSV exported successfully!', 'info');
+    } catch (err) {
+      this.showToast('Failed to export roster CSV: ' + err.message, 'error');
+    }
   }
 
   // =========================================================================
