@@ -918,17 +918,5 @@ class AppController {
   }
 }
 
-// 1-Click demo account filler
-function setDemoLogin(employeeId, password) {
-  document.getElementById('login-employee-id').value = employeeId;
-  document.getElementById('login-password').value = password;
-  const toggleBtn = document.getElementById('btn-toggle-password');
-  if (toggleBtn && document.getElementById('login-password').type === 'text') {
-    document.getElementById('login-password').type = 'password';
-    toggleBtn.innerText = 'Show';
-  }
-  document.getElementById('btn-login-submit').click();
-}
-
 // Initialize Application
 const app = new AppController();
