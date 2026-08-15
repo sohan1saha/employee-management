@@ -54,6 +54,9 @@ def list_employees(
 
     if status and status != "ALL":
         query = query.filter(Employee.status == status)
+    elif not status:
+        # Default behavior: Exclude TERMINATED employees unless status="ALL" or status="TERMINATED" is explicitly provided
+        query = query.filter(Employee.status != "TERMINATED")
 
     offset = (page - 1) * page_size
     employees = query.order_by(Employee.eid.asc()).offset(offset).limit(page_size).all()

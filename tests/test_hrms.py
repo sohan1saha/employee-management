@@ -111,6 +111,16 @@ def test_auth_and_api_flow():
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "TERMINATED"
 
+    # Default list excludes TERMINATED employees
+    list_after_del = client.get("/api/employees", headers=headers)
+    assert list_after_del.status_code == 200
+    assert not any(e["eid"] == 1026999 for e in list_after_del.json())
+
+    # Explicit status=ALL includes TERMINATED employees
+    list_all = client.get("/api/employees?status=ALL", headers=headers)
+    assert list_all.status_code == 200
+    assert any(e["eid"] == 1026999 for e in list_all.json())
+
 
 def test_payroll_and_pdf_generation():
     """Test batch payroll generation and PDF payslip download."""

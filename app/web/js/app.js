@@ -402,8 +402,10 @@ class AppController {
         return;
       }
 
-      tbody.innerHTML = employees.map(emp => `
-        <tr>
+      tbody.innerHTML = employees.map(emp => {
+        const isTerminated = emp.status === 'TERMINATED';
+        return `
+        <tr style="${isTerminated ? 'opacity: 0.65;' : ''}">
           <td><strong style="color: var(--primary);">#${emp.eid}</strong></td>
           <td><b>${emp.ename}</b><br/><span style="font-size:0.75rem; color:var(--text-muted);">${emp.email}</span></td>
           <td>${emp.ecen}</td>
@@ -413,12 +415,14 @@ class AppController {
           <td><span class="badge badge-${emp.status.toLowerCase()}">${emp.status}</span></td>
           <td>
             <div class="action-btns">
-              <button class="btn btn-secondary btn-sm" onclick="app.openEditEmployeeModal(${emp.eid})">Edit</button>
-              ${api.user?.role === 'ADMIN' ? `<button class="btn btn-danger btn-sm" onclick="app.deleteEmployee(${emp.eid})">Delete</button>` : ''}
+              ${!isTerminated ? `<button class="btn btn-secondary btn-sm" onclick="app.openEditEmployeeModal(${emp.eid})">Edit</button>` : ''}
+              ${api.user?.role === 'ADMIN' && !isTerminated ? `<button class="btn btn-danger btn-sm" onclick="app.deleteEmployee(${emp.eid})">Delete</button>` : ''}
+              ${isTerminated ? `<span style="font-size:0.75rem; color:var(--danger); font-weight:600;">Deactivated</span>` : ''}
             </div>
           </td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
     } catch (err) {
       this.showToast('Failed to load employees', 'error');
     }
@@ -551,21 +555,22 @@ class AppController {
 
   async deleteEmployee(eid) {
     const confirmed = await this.confirmAction({
-      title: "Delete Employee Record",
-      badge: "PERMANENT RECORD PURGE",
-      message: `Are you sure you want to permanently delete <b>Employee #${eid}</b>? All linked records will be purged. This action cannot be reversed.`,
-      proceedText: "Proceed & Delete",
+      title: "Deactivate Employee Record",
+      badge: "DEACTIVATION / TERMINATION",
+      message: `Are you sure you want to deactivate <b>Employee #${eid}</b>? Their status will be set to <b>TERMINATED</b> and login access revoked. All historical payroll and leave records are preserved.`,
+      proceedText: "Proceed & Deactivate",
       isDanger: true
     });
     if (!confirmed) return;
 
     try {
       await api.deleteEmployee(eid);
-      this.showToast(`Employee #${eid} deleted successfully.`, 'info');
-      this.loadEmployees();
-      this.loadCentersDropdowns();
+      this.showToast(`Employee #${eid} has been deactivated.`, 'info');
+      await this.loadEmployees();
+      await this.loadCentersDropdowns();
+      await this.loadDashboardAnalytics();
     } catch (err) {
-      this.showToast(err.message || 'Delete failed', 'error');
+      this.showToast(err.message || 'Deactivation failed', 'error');
     }
   }
 
