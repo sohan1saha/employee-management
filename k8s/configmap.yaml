@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: staffsync-config
+  namespace: staffsync
+data:
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  COOKIE_SECURE: "true"
+  COOKIE_HTTPONLY: "true"
+  COOKIE_SAMESITE: "lax"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  MAX_FAILED_LOGIN_ATTEMPTS: "5"
+  ACCOUNT_LOCKOUT_MINUTES: "15"
+  ENABLE_STRUCTURED_LOGGING: "true"
+  FORWARDED_ALLOW_IPS: "127.0.0.1,nginx,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"

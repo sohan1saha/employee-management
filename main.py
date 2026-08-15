@@ -8,12 +8,12 @@ import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.database import engine, Base, get_db
+from app.core.database import engine, Base, get_db, get_read_db, get_pool_status
 import app.models  # Ensures all models are registered with Base metadata
 from app.api.auth_router import router as auth_router
 from app.api.employee_router import router as employee_router
@@ -22,6 +22,7 @@ from app.api.leave_router import router as leave_router
 from app.api.analytics_router import router as analytics_router
 from app.api.audit_router import router as audit_router
 from app.services.cache_service import cache
+from app.services.metrics_service import metrics_collector
 from app.core.emp_mgmt_core import cli_menu
 
 # Logging setup
@@ -105,6 +106,24 @@ async def security_and_tracing_middleware(request: Request, call_next):
     if settings.COOKIE_SECURE:
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
 
+    # 4. Record OpenTelemetry / Prometheus Metrics
+    metrics_collector.record_request(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=response.status_code,
+        duration_seconds=duration
+    )
+
+    # 5. Cloud Structured JSON Logging
+    if settings.ENABLE_STRUCTURED_LOGGING and settings.ENVIRONMENT == "production":
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        logger.info(
+            f'{{"timestamp":"{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}",'
+            f'"level":"INFO","service":"staffsync-api","request_id":"{req_id}",'
+            f'"client_ip":"{client_ip}","method":"{request.method}","path":"{request.url.path}",'
+            f'"status_code":{response.status_code},"duration_ms":{duration * 1000:.2f}}}'
+        )
+
     return response
 
 
@@ -117,6 +136,22 @@ app.include_router(payroll_router, prefix=settings.API_V1_STR)
 app.include_router(leave_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
+
+
+# =============================================================================
+# Observability & Prometheus Metrics Endpoint
+# =============================================================================
+@app.get("/metrics", tags=["Observability"])
+def prometheus_metrics():
+    """Exposes standard OpenMetrics / Prometheus telemetry metrics."""
+    pool_stats = get_pool_status()
+    output = metrics_collector.generate_prometheus_output(
+        active_db_connections=pool_stats.get("checkedout", 0)
+    )
+    return PlainTextResponse(
+        content=output,
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
 
 
 # =============================================================================

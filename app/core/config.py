@@ -7,7 +7,7 @@ Fails startup immediately if required production secrets or configs are missing.
 """
 
 import os
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,7 +26,9 @@ class Settings(BaseSettings):
 
     # Database & Cache
     DATABASE_URL: str = "sqlite:///./staffsync.db"
+    DATABASE_READ_REPLICA_URL: Optional[str] = None  # Optional PostgreSQL read-replica connection string
     REDIS_URL: str = "redis://localhost:6379/0"
+    ENABLE_STRUCTURED_LOGGING: bool = True
 
     # Security Policies
     MAX_FAILED_LOGIN_ATTEMPTS: int = 5

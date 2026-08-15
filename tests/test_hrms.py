@@ -477,6 +477,38 @@ def test_production_secret_fail_startup():
         Settings(
             ENVIRONMENT="production",
             SECRET_KEY="development_jwt_secret_key_change_in_production_staffsync360_min32chars",
-            DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+            DATABASE_URL="postgresql://user:pass@localhost:5432/db",
+            REDIS_URL="redis://localhost:6379/0"
         )
     assert "FATAL STARTUP ERROR" in str(exc_info.value)
+
+
+def test_prometheus_metrics_endpoint():
+    """Verify Prometheus & OpenMetrics /metrics endpoint format and telemetry exposition."""
+    # Trigger a request to populate metrics
+    client.get("/healthz")
+    metrics_res = client.get("/metrics")
+    assert metrics_res.status_code == 200
+    assert "text/plain" in metrics_res.headers["content-type"]
+    body = metrics_res.text
+    assert "process_uptime_seconds" in body
+    assert "http_requests_total" in body
+    assert "http_request_duration_seconds_bucket" in body
+    assert "staffsync_db_active_connections" in body
+
+
+def test_database_read_replica_and_pool_status():
+    """Verify database read-replica session dependency and connection pool status metrics."""
+    from app.core.database import get_read_db, get_pool_status
+    read_db_gen = get_read_db()
+    db_session = next(read_db_gen)
+    assert db_session is not None
+    # Verify pool status metrics
+    pool_metrics = get_pool_status()
+    assert "size" in pool_metrics
+    assert "checkedin" in pool_metrics
+    assert "checkedout" in pool_metrics
+    try:
+        next(read_db_gen)
+    except StopIteration:
+        pass
