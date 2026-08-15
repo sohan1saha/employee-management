@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StaffSync 360 — Enterprise HRMS & Payroll</title>
+  <meta name="description" content="Next-Generation Enterprise HRMS, Automated Payroll & Workforce Intelligence Platform">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================================
+       LOGIN SCREEN OVERLAY
+       ========================================================================= -->
+  <div id="login-overlay" class="login-wrapper">
+    <div class="login-card">
+      <div class="login-header">
+        <h2 style="font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: -0.5px;">StaffSync 360</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 6px;">Enterprise Workforce & Payroll Platform</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="login-employee-id">Employee ID</label>
+          <input type="number" id="login-employee-id" class="form-input" placeholder="e.g. 9924101, 1023101, 1025102" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="login-password" class="form-input" placeholder="••••••••" required>
+            <button type="button" id="btn-toggle-password" class="password-toggle-btn" onclick="app.togglePasswordVisibility('login-password', 'btn-toggle-password')">Show</button>
+          </div>
+        </div>
+        <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+          Sign In to Dashboard
+        </button>
+      </form>
+
+      <div class="demo-credentials">
+        <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 6px;">1-Click Demo Accounts:</div>
+        <div class="demo-btn-group">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setDemoLogin(9924101, 'admin123')">Admin (9924101)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setDemoLogin(1023101, 'manager123')">Manager (1023101)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setDemoLogin(1025102, 'employee123')">Employee (1025102)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MAIN APPLICATION LAYOUT
+       ========================================================================= -->
+  <div class="app-container" id="app-container" style="display: none;">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-header">
+          <a href="#" class="brand">
+            <div>
+              <div class="brand-title">StaffSync 360</div>
+              <div class="brand-subtitle">Enterprise HRMS</div>
+            </div>
+          </a>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a class="nav-item active" data-view="dashboard" id="nav-dashboard">
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-item" data-view="employees" id="nav-employees">
+            <span>Employees</span>
+          </a>
+          <a class="nav-item" data-view="payroll" id="nav-payroll">
+            <span>Payroll Hub</span>
+          </a>
+          <a class="nav-item" data-view="leaves" id="nav-leaves">
+            <span>Leaves & PTO</span>
+          </a>
+          <a class="nav-item" data-view="audit" id="nav-audit">
+            <span>Audit Vault</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-card">
+          <div class="user-card-top">
+            <div class="user-info">
+              <div class="user-avatar" id="sidebar-user-avatar">A</div>
+              <div>
+                <div class="user-name" id="sidebar-user-name">Admin User</div>
+                <div class="user-role-badge" id="sidebar-user-role">ADMIN</div>
+              </div>
+            </div>
+          </div>
+          <div class="user-card-actions">
+            <button type="button" class="btn-sidebar-action" id="btn-open-change-pwd" onclick="app.openChangePasswordModal()" title="Change Password">Password</button>
+            <button type="button" class="btn-logout" id="btn-logout" title="Sign Out">Sign Out</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      
+      <!-- Top Navigation Bar -->
+      <header class="top-bar">
+        <div>
+          <h1 class="page-title" id="page-title">Executive Dashboard</h1>
+          <p class="page-subtitle" id="page-subtitle">Real-time workforce intelligence and operations overview</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-top-change-pwd" onclick="app.openChangePasswordModal()">
+            Change Password
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="app.refreshCurrentView()">
+            Refresh
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-quick-add-emp" onclick="app.openAddEmployeeModal()">
+            Add Employee
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Views Container -->
+      <div class="content-body">
+
+        <!-- ==================== VIEW 1: DASHBOARD ==================== -->
+        <section id="view-dashboard" class="app-view">
+          
+          <!-- ADMIN & MANAGER DASHBOARD -->
+          <div id="dashboard-admin-view">
+            <!-- KPI Summary Cards -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Active Headcount</div>
+                  <div class="kpi-value" id="kpi-headcount">0</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Monthly Payroll</div>
+                  <div class="kpi-value" id="kpi-payroll">₹0</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Operating Centers</div>
+                  <div class="kpi-value" id="kpi-centers">0</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Pending Leaves</div>
+                  <div class="kpi-value" id="kpi-pending-leaves">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Analytics Charts -->
+            <div class="charts-grid" style="margin-top: 24px;">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Center-wise Distribution & Budget</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-centers"></canvas>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Position & Role Breakdown</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-positions"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- EMPLOYEE SELF-SERVICE WORKSPACE -->
+          <div id="dashboard-employee-view" style="display: none;">
+            <!-- Employee Personal KPI Grid -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Net Monthly Pay</div>
+                  <div class="kpi-value" id="emp-kpi-net-salary">₹0</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" id="emp-kpi-gross-salary">Gross: ₹0</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Available PTO / Leaves</div>
+                  <div class="kpi-value" id="emp-kpi-leave-balance">0 Days</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" id="emp-kpi-leaves-taken">0 days consumed</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Pending Applications</div>
+                  <div class="kpi-value" id="emp-kpi-pending-leaves">0</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Awaiting manager review</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div>
+                  <div class="kpi-label">Employment Status</div>
+                  <div class="kpi-value" id="emp-kpi-status" style="font-size: 1.3rem;">ACTIVE</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" id="emp-kpi-joining-date">Joined: —</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Employee Grid -->
+            <div class="emp-portal-grid" style="margin-top: 24px;">
+              <!-- Profile & Compensation Breakdown -->
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">My Profile & Compensation Structure</h3>
+                </div>
+                
+                <div class="emp-profile-header">
+                  <div class="emp-profile-avatar" id="emp-portal-avatar">A</div>
+                  <div style="flex: 1;">
+                    <h4 id="emp-portal-name" style="font-size: 1.15rem; font-weight: 700; color: #fff;">Employee Name</h4>
+                    <p id="emp-portal-pos-cen" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">Role — Center</p>
+                    <p id="emp-portal-email" style="font-size: 0.8rem; color: var(--primary); margin-top: 2px;">email@staffsync.internal</p>
+                  </div>
+                </div>
+
+                <div class="salary-breakdown-list" style="margin-top: 20px;">
+                  <div class="breakdown-row">
+                    <span class="breakdown-label">Base Salary (50%)</span>
+                    <strong id="emp-breakdown-base" class="breakdown-val">₹0</strong>
+                  </div>
+                  <div class="breakdown-row">
+                    <span class="breakdown-label">House Rent Allowance HRA (20%)</span>
+                    <strong id="emp-breakdown-hra" class="breakdown-val">₹0</strong>
+                  </div>
+                  <div class="breakdown-row">
+                    <span class="breakdown-label">Special Allowance (30%)</span>
+                    <strong id="emp-breakdown-allowance" class="breakdown-val">₹0</strong>
+                  </div>
+                  <div class="breakdown-row" style="color: #f87171;">
+                    <span class="breakdown-label">PF & Tax Deductions</span>
+                    <strong id="emp-breakdown-deductions" class="breakdown-val">-₹0</strong>
+                  </div>
+                  <div class="breakdown-divider"></div>
+                  <div class="breakdown-row" style="font-size: 1.05rem; color: #34d399;">
+                    <span>Net Take-Home Pay</span>
+                    <strong id="emp-breakdown-net">₹0</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column -->
+              <div style="display: flex; flex-direction: column; gap: 24px;">
+                
+                <!-- Quick Self-Service Actions -->
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">Quick Actions</h3>
+                  </div>
+                  <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="app.openApplyLeaveModal()" style="flex: 1; min-width: 140px; justify-content: center;">
+                      Request Time Off
+                    </button>
+                    <button class="btn btn-secondary" onclick="app.switchView('payroll')" style="flex: 1; min-width: 140px; justify-content: center;">
+                      My Payslips
+                    </button>
+                    <button class="btn btn-secondary" onclick="app.openChangePasswordModal()" style="flex: 1; min-width: 140px; justify-content: center;">
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Recent Leave Applications -->
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">My Recent Leave Requests</h3>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="data-table" style="font-size: 0.85rem;">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Duration</th>
+                          <th>Days</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="emp-portal-recent-leaves">
+                        <!-- Rendered via JS -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Upcoming Paid Holidays -->
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">Upcoming Company Holidays</h3>
+                  </div>
+                  <div id="emp-portal-holidays-list" class="holidays-list">
+                    <!-- Rendered via JS -->
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ==================== VIEW 2: EMPLOYEES ==================== -->
+        <section id="view-employees" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="table-controls">
+              <div class="search-input-wrap">
+                <input type="text" id="emp-search" class="search-input" placeholder="Search by Name, ID, or Position...">
+              </div>
+              <div class="filter-group">
+                <select id="emp-center-filter" class="select-custom">
+                  <option value="ALL">All Centers</option>
+                </select>
+                <select id="emp-status-filter" class="select-custom">
+                  <option value="ALL">All Statuses</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="ON_LEAVE">On Leave</option>
+                  <option value="TERMINATED">Terminated</option>
+                </select>
+                <button class="btn btn-primary" onclick="app.openAddEmployeeModal()">
+                  Add Employee
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID (eid)</th>
+                    <th>Name (ename)</th>
+                    <th>Center (ecen)</th>
+                    <th>Position (epos)</th>
+                    <th>Salary (esal)</th>
+                    <th>Joining Date (edoj)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="employees-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 3: PAYROLL HUB ==================== -->
+        <section id="view-payroll" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="table-controls">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <label class="form-label" style="margin: 0;">Billing Month:</label>
+                <input type="month" id="payroll-month-select" class="form-input" style="width: auto;">
+              </div>
+              <div class="filter-group">
+                <select id="payroll-center-filter" class="select-custom">
+                  <option value="ALL">All Centers</option>
+                </select>
+                <button class="btn btn-primary" id="btn-run-payroll" onclick="app.triggerPayrollBatch()">
+                  Process Monthly Payroll
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Center</th>
+                    <th>Base (50%)</th>
+                    <th>HRA (20%)</th>
+                    <th>Allowance (30%)</th>
+                    <th>Deductions (PF+Tax)</th>
+                    <th>Net Salary</th>
+                    <th>Status</th>
+                    <th>Payslip PDF</th>
+                  </tr>
+                </thead>
+                <tbody id="payroll-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 4: LEAVES & PTO ==================== -->
+        <section id="view-leaves" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="table-controls">
+              <div class="filter-group">
+                <select id="leave-status-filter" class="select-custom">
+                  <option value="ALL">All Requests</option>
+                  <option value="PENDING">Pending Review</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="app.openApplyLeaveModal()">
+                Request Time Off
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Req #</th>
+                    <th>Employee</th>
+                    <th>Type</th>
+                    <th>Duration</th>
+                    <th>Days</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Review / Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="leaves-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 5: AUDIT VAULT ==================== -->
+        <section id="view-audit" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Immutable Security & Modification Audit Trail</h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                  Automatic zero-trust logging of all CRUD actions, salary updates, and approvals.
+                </p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="app.loadAuditLogs()">Refresh Logs</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Actor / Employee ID</th>
+                    <th>Action</th>
+                    <th>Target Record</th>
+                    <th>Old Value</th>
+                    <th>New Value</th>
+                    <th>Client IP</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       MODALS
+       ========================================================================= -->
+  
+  <!-- Add Employee Modal -->
+  <div id="modal-add-employee" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Add New Employee</h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <form id="form-add-employee">
+        <div class="form-row">
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="add-eid" style="margin: 0;">Employee ID (eid)</label>
+              <span id="add-eid-badge" style="font-size: 0.72rem; color: var(--primary); font-weight: 600;">Auto-Generated</span>
+            </div>
+            <input type="number" id="add-eid" class="form-input" placeholder="e.g. 1026101" required style="margin-top: 6px;">
+            <small style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; display: block;" id="add-eid-pattern-hint">Pattern: [Center Code][YY][Serial] (e.g. Bangalore 10 + 26 + 101)</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-ename">Full Name (ename)</label>
+            <input type="text" id="add-ename" class="form-input" placeholder="e.g. Rachel Green" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="add-ecen">Center / Branch (ecen)</label>
+            <input type="text" id="add-ecen" class="form-input" placeholder="e.g. Bangalore, Delhi, Mumbai" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-epos">Position (epos)</label>
+            <input type="text" id="add-epos" class="form-input" placeholder="e.g. Software Engineer" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="add-esal">Monthly Salary (esal)</label>
+            <input type="number" id="add-esal" class="form-input" placeholder="e.g. 75000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-edoj">Date of Joining (edoj)</label>
+            <input type="date" id="add-edoj" class="form-input" required>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Employee Modal -->
+  <div id="modal-edit-employee" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Employee Profile</h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <form id="form-edit-employee">
+        <input type="hidden" id="edit-eid">
+        <div class="form-group">
+          <label class="form-label">Employee ID</label>
+          <input type="text" id="edit-eid-display" class="form-input" disabled>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-ename">Employee Name (ename)</label>
+          <input type="text" id="edit-ename" class="form-input" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="edit-ecen">Center (ecen)</label>
+            <input type="text" id="edit-ecen" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-epos">Position (epos)</label>
+            <input type="text" id="edit-epos" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="edit-esal">Monthly Salary (esal)</label>
+            <input type="number" id="edit-esal" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-status">Status</label>
+            <select id="edit-status" class="select-custom" style="width: 100%;">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="ON_LEAVE">ON_LEAVE</option>
+              <option value="TERMINATED">TERMINATED</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Apply Leave Modal -->
+  <div id="modal-apply-leave" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Request Time Off / Leave</h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <form id="form-apply-leave">
+        <div class="form-group">
+          <label class="form-label" for="leave-emp-id">Employee ID</label>
+          <input type="number" id="leave-emp-id" class="form-input" placeholder="e.g. 101" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="leave-type">Leave Type</label>
+          <select id="leave-type" class="select-custom" style="width: 100%;">
+            <option value="CASUAL">Casual Leave</option>
+            <option value="SICK">Sick Leave</option>
+            <option value="PTO">Paid Time Off (PTO)</option>
+            <option value="UNPAID">Unpaid Leave</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="leave-start-date">Start Date</label>
+            <input type="date" id="leave-start-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="leave-end-date">End Date</label>
+            <input type="date" id="leave-end-date" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="leave-reason">Reason</label>
+          <textarea id="leave-reason" class="form-input" rows="3" placeholder="State reason for absence..." required></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change Password Modal (For all users: Employee, Manager, Admin) -->
+  <div id="modal-change-password" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Account Security: Change Password</h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <form id="form-change-password">
+        <div class="form-group">
+          <label class="form-label" for="pwd-old">Current / Old Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="pwd-old" class="form-input" placeholder="Enter current password" required>
+            <button type="button" id="btn-toggle-old-pwd" class="password-toggle-btn" onclick="app.togglePasswordVisibility('pwd-old', 'btn-toggle-old-pwd')">Show</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="pwd-new">New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="pwd-new" class="form-input" placeholder="Enter new password (min. 6 chars)" minlength="6" required>
+            <button type="button" id="btn-toggle-new-pwd" class="password-toggle-btn" onclick="app.togglePasswordVisibility('pwd-new', 'btn-toggle-new-pwd')">Show</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="pwd-confirm">Re-enter New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="pwd-confirm" class="form-input" placeholder="Re-enter new password" minlength="6" required>
+            <button type="button" id="btn-toggle-confirm-pwd" class="password-toggle-btn" onclick="app.togglePasswordVisibility('pwd-confirm', 'btn-toggle-confirm-pwd')">Show</button>
+          </div>
+          <small style="color: var(--text-muted); font-size: 0.76rem; display: block; margin-top: 4px;">
+            Password must be at least 6 characters long and different from current password.
+          </small>
+        </div>
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-change-pwd">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Crucial Action Confirmation Pop-Up Modal (Proceed or Exit) -->
+  <div id="modal-confirm-action" class="modal-overlay">
+    <div class="modal-content" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="confirm-modal-title" style="color: #f59e0b;">Action Confirmation Required</h3>
+        <button class="modal-close" onclick="app.cancelConfirmAction()">✕</button>
+      </div>
+      <div style="padding: 10px 0 20px 0;">
+        <div id="confirm-modal-banner" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;">
+          <div style="font-weight: 700; font-size: 0.85rem; color: #fbbf24; margin-bottom: 6px;" id="confirm-modal-badge">CRUCIAL SYSTEM ACTION</div>
+          <p id="confirm-modal-message" style="font-size: 0.9rem; color: #f1f5f9; line-height: 1.5; margin: 0;">
+            Are you sure you want to proceed with this operation?
+          </p>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+          Please review the details above. Click <b>Proceed</b> to execute this change or <b>Exit</b> to cancel safely.
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btn-confirm-exit" onclick="app.cancelConfirmAction()" style="min-width: 100px;">
+          Exit
+        </button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-proceed" onclick="app.executeConfirmAction()" style="min-width: 110px;">
+          Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,934 @@
+/**
+ * StaffSync 360 - Main Dashboard & UI Controller
+ */
+
+class AppController {
+  constructor() {
+    this.currentView = 'dashboard';
+    this.centersChart = null;
+    this.positionsChart = null;
+    this.init();
+  }
+
+  init() {
+    this.bindEvents();
+    this.checkAuth();
+  }
+
+  // =========================================================================
+  // Authentication & Session
+  // =========================================================================
+  checkAuth() {
+    if (api.token && api.user) {
+      this.showAppLayout();
+    } else {
+      this.showLoginOverlay();
+    }
+  }
+
+  showLoginOverlay() {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('app-container').style.display = 'none';
+  }
+
+  showAppLayout() {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app-container').style.display = 'flex';
+    
+    // Update user profile badges with Employee Full Name or Employee ID
+    const user = api.user || {};
+    const displayName = user.full_name || (user.employee_id ? `#${user.employee_id}` : (user.username || 'User'));
+    document.getElementById('sidebar-user-name').innerText = displayName;
+    document.getElementById('sidebar-user-role').innerText = user.role || 'STAFF';
+    document.getElementById('sidebar-user-avatar').innerText = (displayName.replace('#', '') || 'U')[0].toUpperCase();
+
+    // Adjust RBAC UI elements
+    const navEmployees = document.getElementById('nav-employees');
+    const navAudit = document.getElementById('nav-audit');
+    const navDashboard = document.getElementById('nav-dashboard');
+    const navPayroll = document.getElementById('nav-payroll');
+    const navLeaves = document.getElementById('nav-leaves');
+    const btnQuickAdd = document.getElementById('btn-quick-add-emp');
+    const btnRunPayroll = document.getElementById('btn-run-payroll');
+
+    if (user.role === 'EMPLOYEE') {
+      if (navEmployees) navEmployees.style.display = 'none';
+      if (navAudit) navAudit.style.display = 'none';
+      if (btnQuickAdd) btnQuickAdd.style.display = 'none';
+      if (btnRunPayroll) btnRunPayroll.style.display = 'none';
+      if (navDashboard) navDashboard.querySelector('span').innerText = 'My Workspace';
+      if (navPayroll) navPayroll.querySelector('span').innerText = 'My Payslips';
+      if (navLeaves) navLeaves.querySelector('span').innerText = 'My Leaves & PTO';
+    } else if (user.role === 'MANAGER') {
+      if (navEmployees) navEmployees.style.display = 'flex';
+      if (navAudit) navAudit.style.display = 'flex';
+      if (btnQuickAdd) btnQuickAdd.style.display = 'inline-flex';
+      if (btnRunPayroll) btnRunPayroll.style.display = 'none';
+      if (navDashboard) navDashboard.querySelector('span').innerText = 'Dashboard';
+      if (navPayroll) navPayroll.querySelector('span').innerText = 'Payroll Hub';
+      if (navLeaves) navLeaves.querySelector('span').innerText = 'Leaves & PTO';
+    } else {
+      if (navEmployees) navEmployees.style.display = 'flex';
+      if (navAudit) navAudit.style.display = 'flex';
+      if (btnQuickAdd) btnQuickAdd.style.display = 'inline-flex';
+      if (btnRunPayroll) btnRunPayroll.style.display = 'inline-flex';
+      if (navDashboard) navDashboard.querySelector('span').innerText = 'Dashboard';
+      if (navPayroll) navPayroll.querySelector('span').innerText = 'Payroll Hub';
+      if (navLeaves) navLeaves.querySelector('span').innerText = 'Leaves & PTO';
+    }
+
+    // Set default month in payroll selector (current YYYY-MM)
+    const today = new Date();
+    const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const monthPicker = document.getElementById('payroll-month-select');
+    if (monthPicker && !monthPicker.value) {
+      monthPicker.value = monthStr;
+    }
+
+    this.switchView('dashboard');
+    this.loadCentersDropdowns();
+  }
+
+  bindEvents() {
+    // Login form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const empId = document.getElementById('login-employee-id').value.trim();
+      const p = document.getElementById('login-password').value;
+      try {
+        await api.login(empId, p);
+        this.showToast('Logged in successfully!', 'success');
+        this.showAppLayout();
+      } catch (err) {
+        this.showToast(err.message || 'Login failed', 'error');
+      }
+    });
+
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await api.logout();
+      this.showLoginOverlay();
+      this.showToast('Signed out successfully.', 'info');
+    });
+
+    // Sidebar navigation
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const view = item.getAttribute('data-view');
+        this.switchView(view);
+      });
+    });
+
+    // Search and filters for employees
+    document.getElementById('emp-search').addEventListener('input', () => this.debounce(() => this.loadEmployees(), 300));
+    document.getElementById('emp-center-filter').addEventListener('change', () => this.loadEmployees());
+    document.getElementById('emp-status-filter').addEventListener('change', () => this.loadEmployees());
+
+    // Payroll filters
+    document.getElementById('payroll-month-select').addEventListener('change', () => this.loadPayroll());
+    document.getElementById('payroll-center-filter').addEventListener('change', () => this.loadPayroll());
+
+    // Leave filters
+    document.getElementById('leave-status-filter').addEventListener('change', () => this.loadLeaves());
+
+    // Form Submissions
+    document.getElementById('form-add-employee').addEventListener('submit', (e) => this.handleAddEmployee(e));
+    document.getElementById('form-edit-employee').addEventListener('submit', (e) => this.handleEditEmployee(e));
+    document.getElementById('form-apply-leave').addEventListener('submit', (e) => this.handleApplyLeave(e));
+    const formChangePwd = document.getElementById('form-change-password');
+    if (formChangePwd) {
+      formChangePwd.addEventListener('submit', (e) => this.handleChangePassword(e));
+    }
+
+    // Dynamic Employee ID generation listeners on Center and DOJ change
+    document.getElementById('add-ecen').addEventListener('input', () => this.debounce(() => this.refreshRecommendedEmployeeId(), 300));
+    document.getElementById('add-edoj').addEventListener('change', () => this.refreshRecommendedEmployeeId());
+
+    // Global unauthorized handler
+    window.addEventListener('auth:unauthorized', () => {
+      this.showLoginOverlay();
+      this.showToast('Session expired. Please log in.', 'error');
+    });
+  }
+
+  // =========================================================================
+  // Navigation & View Controller
+  // =========================================================================
+  switchView(viewName) {
+    this.currentView = viewName;
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === viewName);
+    });
+
+    document.querySelectorAll('.app-view').forEach(el => {
+      el.style.display = 'none';
+    });
+
+    const target = document.getElementById(`view-${viewName}`);
+    if (target) target.style.display = 'block';
+
+    const titles = {
+      dashboard: [
+        api.user?.role === 'EMPLOYEE'
+          ? 'My Workspace'
+          : (api.user?.role === 'MANAGER' && this.availableCenters?.length === 1
+              ? `${this.availableCenters[0]} Center Dashboard`
+              : 'Executive Dashboard'),
+        api.user?.role === 'EMPLOYEE'
+          ? 'Personal overview, salary structure, and time-off balance'
+          : (api.user?.role === 'MANAGER'
+              ? 'Center workforce intelligence and operations overview'
+              : 'Real-time workforce intelligence and operations overview')
+      ],
+      employees: ['Employee Directory', 'Master records and profile management'],
+      payroll: [
+        api.user?.role === 'EMPLOYEE' ? 'My Payslips & Compensation' : 'Payroll Hub & Compensation',
+        api.user?.role === 'EMPLOYEE' ? 'View and download your monthly salary statements' : 'Automated monthly salary calculation and PDF payslips'
+      ],
+      leaves: [
+        api.user?.role === 'EMPLOYEE' ? 'My Leaves & Attendance' : 'Leaves & Attendance',
+        api.user?.role === 'EMPLOYEE' ? 'Submit and track your time off applications' : 'Employee time-off requests and manager approvals'
+      ],
+      audit: ['Audit Vault', 'Immutable system activity and modification logs']
+    };
+
+    document.getElementById('page-title').innerText = titles[viewName]?.[0] || 'Dashboard';
+    document.getElementById('page-subtitle').innerText = titles[viewName]?.[1] || '';
+
+    this.refreshCurrentView();
+  }
+
+  refreshCurrentView() {
+    if (this.currentView === 'dashboard') this.loadDashboard();
+    else if (this.currentView === 'employees') this.loadEmployees();
+    else if (this.currentView === 'payroll') this.loadPayroll();
+    else if (this.currentView === 'leaves') this.loadLeaves();
+    else if (this.currentView === 'audit') this.loadAuditLogs();
+  }
+
+  // =========================================================================
+  // Centers & Dropdowns
+  // =========================================================================
+  async loadCentersDropdowns() {
+    try {
+      const centers = await api.getCenters();
+      this.availableCenters = centers;
+      const empSelect = document.getElementById('emp-center-filter');
+      const paySelect = document.getElementById('payroll-center-filter');
+
+      if (api.user?.role === 'MANAGER' && centers.length === 1) {
+        const optionsHtml = `<option value="${centers[0]}">${centers[0]} Center</option>`;
+        empSelect.innerHTML = optionsHtml;
+        paySelect.innerHTML = optionsHtml;
+        empSelect.disabled = true;
+        paySelect.disabled = true;
+      } else {
+        const optionsHtml = '<option value="ALL">All Centers</option>' +
+          centers.map(c => `<option value="${c}">${c}</option>`).join('');
+        empSelect.innerHTML = optionsHtml;
+        paySelect.innerHTML = optionsHtml;
+        empSelect.disabled = false;
+        paySelect.disabled = false;
+      }
+    } catch (err) {
+      console.error('Failed to load centers:', err);
+    }
+  }
+
+  // =========================================================================
+  // 1. Dashboard View
+  // =========================================================================
+  async loadDashboard() {
+    try {
+      const data = await api.getAnalytics();
+      
+      // If Employee Portal
+      if (data.is_employee_portal) {
+        document.getElementById('dashboard-admin-view').style.display = 'none';
+        document.getElementById('dashboard-employee-view').style.display = 'block';
+
+        const kpis = data.kpis;
+        const emp = data.employee || {};
+        const sal = data.salary_breakdown || {};
+
+        document.getElementById('emp-kpi-net-salary').innerText = `₹${(kpis.monthly_net || 0).toLocaleString('en-IN')}`;
+        document.getElementById('emp-kpi-gross-salary').innerText = `Gross: ₹${(kpis.monthly_gross || 0).toLocaleString('en-IN')}/mo`;
+        document.getElementById('emp-kpi-leave-balance').innerText = `${kpis.leave_balance || 0} Days`;
+        document.getElementById('emp-kpi-leaves-taken').innerText = `${kpis.days_taken || 0} days consumed`;
+        document.getElementById('emp-kpi-pending-leaves').innerText = `${kpis.pending_leaves || 0}`;
+        document.getElementById('emp-kpi-status').innerText = kpis.status || 'ACTIVE';
+        document.getElementById('emp-kpi-joining-date').innerText = `Joined: ${kpis.joining_date || '—'}`;
+
+        document.getElementById('emp-portal-avatar').innerText = (emp.ename || 'E')[0].toUpperCase();
+        document.getElementById('emp-portal-name').innerText = emp.ename || 'Employee';
+        document.getElementById('emp-portal-pos-cen').innerText = `${emp.epos || 'Staff'} — ${emp.ecen || 'Headquarters'} Center`;
+        document.getElementById('emp-portal-email').innerText = emp.email || '';
+
+        document.getElementById('emp-breakdown-base').innerText = `₹${(sal.base_salary || 0).toLocaleString('en-IN')}`;
+        document.getElementById('emp-breakdown-hra').innerText = `₹${(sal.hra || 0).toLocaleString('en-IN')}`;
+        document.getElementById('emp-breakdown-allowance').innerText = `₹${(sal.allowance || 0).toLocaleString('en-IN')}`;
+        document.getElementById('emp-breakdown-deductions').innerText = `-₹${((sal.pf_deduction || 0) + (sal.tax_deduction || 0)).toLocaleString('en-IN')}`;
+        document.getElementById('emp-breakdown-net').innerText = `₹${(sal.net_salary || 0).toLocaleString('en-IN')}`;
+
+        // Render Recent Leaves Table
+        const recentLeavesTbody = document.getElementById('emp-portal-recent-leaves');
+        if (!data.recent_leaves || data.recent_leaves.length === 0) {
+          recentLeavesTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:16px;">No recent leave requests.</td></tr>`;
+        } else {
+          recentLeavesTbody.innerHTML = data.recent_leaves.map(l => `
+            <tr>
+              <td><span class="badge badge-primary">${l.leave_type}</span></td>
+              <td>${l.start_date}</td>
+              <td><b>${l.days_count}d</b></td>
+              <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
+            </tr>
+          `).join('');
+        }
+
+        // Render Holidays List
+        const holidaysContainer = document.getElementById('emp-portal-holidays-list');
+        if (data.holidays && holidaysContainer) {
+          holidaysContainer.innerHTML = data.holidays.map(h => `
+            <div class="holiday-item">
+              <div>
+                <b>${h.name}</b>
+                <div style="font-size:0.75rem; color:var(--text-muted);">${h.type} Holiday</div>
+              </div>
+              <span class="holiday-date">${h.date}</span>
+            </div>
+          `).join('');
+        }
+
+        return;
+      }
+
+      // Admin & Manager Portal
+      document.getElementById('dashboard-admin-view').style.display = 'block';
+      document.getElementById('dashboard-employee-view').style.display = 'none';
+
+      const kpis = data.kpis;
+      document.getElementById('kpi-headcount').innerText = kpis.active_employees;
+      document.getElementById('kpi-payroll').innerText = `₹${(kpis.monthly_payroll_burn).toLocaleString('en-IN')}`;
+      document.getElementById('kpi-centers').innerText = kpis.total_centers;
+      document.getElementById('kpi-pending-leaves').innerText = kpis.pending_leaves;
+
+      this.renderCentersChart(data.center_distribution);
+      this.renderPositionsChart(data.position_distribution);
+    } catch (err) {
+      this.showToast('Failed to load analytics', 'error');
+    }
+  }
+
+  renderCentersChart(data) {
+    const ctx = document.getElementById('chart-centers').getContext('2d');
+    const labels = data.map(d => d.center);
+    const headcounts = data.map(d => d.headcount);
+
+    if (this.centersChart) this.centersChart.destroy();
+
+    this.centersChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Employee Count',
+          data: headcounts,
+          backgroundColor: 'rgba(99, 102, 241, 0.7)',
+          borderColor: '#6366f1',
+          borderWidth: 1,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+          y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af', precision: 0 } }
+        }
+      }
+    });
+  }
+
+  renderPositionsChart(data) {
+    const ctx = document.getElementById('chart-positions').getContext('2d');
+    const labels = data.map(d => d.position);
+    const counts = data.map(d => d.count);
+
+    if (this.positionsChart) this.positionsChart.destroy();
+
+    this.positionsChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: [
+            '#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#9ca3af', boxWidth: 12 }
+          }
+        }
+      }
+    });
+  }
+
+  // =========================================================================
+  // 2. Employees View
+  // =========================================================================
+  async loadEmployees() {
+    const search = document.getElementById('emp-search').value.trim();
+    const center = document.getElementById('emp-center-filter').value;
+    const status = document.getElementById('emp-status-filter').value;
+
+    try {
+      const employees = await api.getEmployees({ search, center, status });
+      const tbody = document.getElementById('employees-table-body');
+      
+      if (employees.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No employees matching criteria.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = employees.map(emp => `
+        <tr>
+          <td><strong style="color: var(--primary);">#${emp.eid}</strong></td>
+          <td><b>${emp.ename}</b><br/><span style="font-size:0.75rem; color:var(--text-muted);">${emp.email}</span></td>
+          <td>${emp.ecen}</td>
+          <td>${emp.epos}</td>
+          <td>₹${emp.esal.toLocaleString('en-IN')}</td>
+          <td>${emp.edoj}</td>
+          <td><span class="badge badge-${emp.status.toLowerCase()}">${emp.status}</span></td>
+          <td>
+            <div class="action-btns">
+              <button class="btn btn-secondary btn-sm" onclick="app.openEditEmployeeModal(${emp.eid})">Edit</button>
+              ${api.user?.role === 'ADMIN' ? `<button class="btn btn-danger btn-sm" onclick="app.deleteEmployee(${emp.eid})">Delete</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      this.showToast('Failed to load employees', 'error');
+    }
+  }
+
+  async openAddEmployeeModal() {
+    document.getElementById('form-add-employee').reset();
+    const ecenInput = document.getElementById('add-ecen');
+    const edojInput = document.getElementById('add-edoj');
+
+    // Default Date of Joining to today's date
+    const today = new Date().toISOString().split('T')[0];
+    edojInput.value = today;
+
+    if (api.user?.role === 'MANAGER' && this.availableCenters?.length === 1) {
+      ecenInput.value = this.availableCenters[0];
+      ecenInput.readOnly = true;
+    } else {
+      ecenInput.readOnly = false;
+      if (!ecenInput.value) {
+        ecenInput.value = (this.availableCenters && this.availableCenters.length > 0) ? this.availableCenters[0] : 'Bangalore';
+      }
+    }
+
+    document.getElementById('modal-add-employee').classList.add('active');
+    await this.refreshRecommendedEmployeeId();
+  }
+
+  async refreshRecommendedEmployeeId() {
+    const center = document.getElementById('add-ecen').value.trim() || 'Bangalore';
+    const doj = document.getElementById('add-edoj').value || new Date().toISOString().split('T')[0];
+    try {
+      const res = await api.getNextEmployeeId({ center, doj });
+      if (res && res.next_id) {
+        document.getElementById('add-eid').value = res.next_id;
+        const hintEl = document.getElementById('add-eid-pattern-hint');
+        if (hintEl) {
+          hintEl.innerText = `Pattern: ${center} (${res.center_code}) + '${doj.substring(2, 4)} + Serial (${res.next_id.toString().substring(4)})`;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-fetch recommended ID:', err);
+    }
+  }
+
+  async handleAddEmployee(e) {
+    e.preventDefault();
+    const payload = {
+      eid: parseInt(document.getElementById('add-eid').value),
+      ename: document.getElementById('add-ename').value.trim(),
+      ecen: document.getElementById('add-ecen').value.trim(),
+      epos: document.getElementById('add-epos').value.trim(),
+      esal: parseFloat(document.getElementById('add-esal').value),
+      edoj: document.getElementById('add-edoj').value
+    };
+
+    try {
+      await api.createEmployee(payload);
+      this.closeModals();
+      this.showToast(`Employee #${payload.eid} added successfully!`, 'success');
+      this.loadEmployees();
+      this.loadCentersDropdowns();
+    } catch (err) {
+      this.showToast(err.message || 'Failed to add employee', 'error');
+    }
+  }
+
+  async openEditEmployeeModal(eid) {
+    try {
+      const emp = await api.getEmployee(eid);
+      document.getElementById('edit-eid').value = emp.eid;
+      document.getElementById('edit-eid-display').value = `#${emp.eid} (${emp.email})`;
+      document.getElementById('edit-ename').value = emp.ename;
+      document.getElementById('edit-ecen').value = emp.ecen;
+      if (api.user?.role === 'MANAGER') {
+        document.getElementById('edit-ecen').readOnly = true;
+      } else {
+        document.getElementById('edit-ecen').readOnly = false;
+      }
+      document.getElementById('edit-epos').value = emp.epos;
+      document.getElementById('edit-esal').value = emp.esal;
+      document.getElementById('edit-esal').dataset.originalSalary = emp.esal;
+      document.getElementById('edit-status').value = emp.status;
+
+      document.getElementById('modal-edit-employee').style.display = 'flex';
+      document.getElementById('modal-edit-employee').classList.add('active');
+    } catch (err) {
+      this.showToast(err.message || 'Failed to load employee details', 'error');
+    }
+  }
+
+  async handleEditEmployee(e) {
+    e.preventDefault();
+    const eid = document.getElementById('edit-eid').value;
+    const originalSal = parseFloat(document.getElementById('edit-esal').dataset.originalSalary || 0);
+    const newSal = parseFloat(document.getElementById('edit-esal').value);
+    const ename = document.getElementById('edit-ename').value.trim();
+
+    // Check if salary was increased or significantly altered
+    if (originalSal > 0 && newSal !== originalSal) {
+      const isIncrease = newSal > originalSal;
+      const diff = Math.abs(newSal - originalSal);
+      const confirmed = await this.confirmAction({
+        title: isIncrease ? "Confirm Salary Increase" : "Confirm Salary Adjustment",
+        badge: isIncrease ? "COMPENSATION INCREASE" : "COMPENSATION ADJUSTMENT",
+        message: `You are modifying monthly salary for <b>${ename} (Employee #${eid})</b> from <b>₹${originalSal.toLocaleString('en-IN')}</b> to <b>₹${newSal.toLocaleString('en-IN')}</b> (${isIncrease ? '+' : '-'}₹${diff.toLocaleString('en-IN')}).`,
+        proceedText: "Proceed & Update",
+        isDanger: false
+      });
+      if (!confirmed) return;
+    }
+
+    const payload = {
+      ename: ename,
+      ecen: document.getElementById('edit-ecen').value.trim(),
+      epos: document.getElementById('edit-epos').value.trim(),
+      esal: newSal,
+      status: document.getElementById('edit-status').value
+    };
+
+    try {
+      await api.updateEmployee(eid, payload);
+      this.closeModals();
+      this.showToast(`Employee #${eid} updated successfully!`, 'success');
+      this.loadEmployees();
+    } catch (err) {
+      this.showToast(err.message || 'Update failed', 'error');
+    }
+  }
+
+  async deleteEmployee(eid) {
+    const confirmed = await this.confirmAction({
+      title: "Delete Employee Record",
+      badge: "PERMANENT RECORD PURGE",
+      message: `Are you sure you want to permanently delete <b>Employee #${eid}</b>? All linked records will be purged. This action cannot be reversed.`,
+      proceedText: "Proceed & Delete",
+      isDanger: true
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.deleteEmployee(eid);
+      this.showToast(`Employee #${eid} deleted successfully.`, 'info');
+      this.loadEmployees();
+      this.loadCentersDropdowns();
+    } catch (err) {
+      this.showToast(err.message || 'Delete failed', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 3. Payroll Hub View
+  // =========================================================================
+  async loadPayroll() {
+    const month = document.getElementById('payroll-month-select').value;
+    const center = document.getElementById('payroll-center-filter').value;
+
+    try {
+      const records = await api.getPayroll({ month_year: month, center });
+      const tbody = document.getElementById('payroll-table-body');
+
+      if (records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">No payroll records for ${month || 'selected criteria'}. Click "Process Monthly Payroll" to generate.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = records.map(r => `
+        <tr>
+          <td><strong style="color: var(--primary);">#${r.employee_id}</strong></td>
+          <td><b>${r.employee_name}</b></td>
+          <td>${r.center}</td>
+          <td>₹${r.base_salary.toLocaleString('en-IN')}</td>
+          <td>₹${r.hra.toLocaleString('en-IN')}</td>
+          <td>₹${r.allowance.toLocaleString('en-IN')}</td>
+          <td style="color: var(--danger);">-₹${(r.pf_deduction + r.tax_deduction).toLocaleString('en-IN')}</td>
+          <td><strong style="color: var(--success);">₹${r.net_salary.toLocaleString('en-IN')}</strong></td>
+          <td><span class="badge badge-paid">${r.payment_status}</span></td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="api.downloadPayslip(${r.id}, 'Payslip_${r.employee_name}_${r.month_year}.pdf')">
+              Download PDF
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      this.showToast('Failed to load payroll', 'error');
+    }
+  }
+
+  async triggerPayrollBatch() {
+    const month = document.getElementById('payroll-month-select').value;
+    const center = document.getElementById('payroll-center-filter').value;
+
+    const confirmed = await this.confirmAction({
+      title: "Execute Enterprise Payroll Batch",
+      badge: "FINANCIAL BATCH RUN",
+      message: `Are you sure you want to run batch payroll calculation and generate payslips for billing cycle <b>${month || 'current month'}</b> across <b>${center || 'All Centers'}</b>?`,
+      proceedText: "Proceed & Generate",
+      isDanger: false
+    });
+    if (!confirmed) return;
+
+    try {
+      const result = await api.generatePayroll({ month_year: month, center });
+      this.showToast(`Processed payroll for ${result.length} employees!`, 'success');
+      this.loadPayroll();
+      this.loadDashboard();
+    } catch (err) {
+      this.showToast(err.message || 'Payroll processing failed', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 4. Leaves View
+  // =========================================================================
+  async loadLeaves() {
+    const status_filter = document.getElementById('leave-status-filter').value;
+    try {
+      const leaves = await api.getLeaves({ status_filter });
+      const tbody = document.getElementById('leaves-table-body');
+
+      if (leaves.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No leave requests found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = leaves.map(l => `
+        <tr>
+          <td>#${l.id}</td>
+          <td><b>${l.employee_name}</b> (Emp #${l.employee_id})</td>
+          <td><span class="badge badge-primary">${l.leave_type}</span></td>
+          <td>${l.start_date} to ${l.end_date}</td>
+          <td><b>${l.days_count} days</b></td>
+          <td>${l.reason}</td>
+          <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
+          <td>
+            ${l.status === 'PENDING' && api.user?.role !== 'EMPLOYEE' ? `
+              <div class="action-btns">
+                <button class="btn btn-primary btn-sm" onclick="app.reviewLeave(${l.id}, 'APPROVED')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="app.reviewLeave(${l.id}, 'REJECTED')">Reject</button>
+              </div>
+            ` : (l.review_comment ? `<small style="color:var(--text-muted);">${l.review_comment}</small>` : '—')}
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      this.showToast('Failed to load leaves', 'error');
+    }
+  }
+
+  openApplyLeaveModal() {
+    document.getElementById('form-apply-leave').reset();
+    if (api.user?.role === 'EMPLOYEE' && api.user?.employee_id) {
+      document.getElementById('leave-emp-id').value = api.user.employee_id;
+      document.getElementById('leave-emp-id').readOnly = true;
+    } else {
+      document.getElementById('leave-emp-id').readOnly = false;
+    }
+    document.getElementById('modal-apply-leave').style.display = 'flex';
+    document.getElementById('modal-apply-leave').classList.add('active');
+  }
+
+  async handleApplyLeave(e) {
+    e.preventDefault();
+    const payload = {
+      employee_id: parseInt(document.getElementById('leave-emp-id').value),
+      leave_type: document.getElementById('leave-type').value,
+      start_date: document.getElementById('leave-start-date').value,
+      end_date: document.getElementById('leave-end-date').value,
+      reason: document.getElementById('leave-reason').value.trim()
+    };
+
+    try {
+      await api.submitLeave(payload);
+      this.closeModals();
+      this.showToast('Leave request submitted successfully!', 'success');
+      this.loadLeaves();
+      this.loadDashboard();
+    } catch (err) {
+      this.showToast(err.message || 'Failed to submit leave', 'error');
+    }
+  }
+
+  async reviewLeave(leaveId, status) {
+    const isReject = status === 'REJECTED';
+    const confirmed = await this.confirmAction({
+      title: isReject ? "Reject Leave Request" : "Approve Leave Request",
+      badge: isReject ? "LEAVE REJECTION" : "LEAVE APPROVAL",
+      message: `Are you sure you want to mark Leave Request <b>#${leaveId}</b> as <b>${status}</b>?`,
+      proceedText: `Proceed & ${status === 'APPROVED' ? 'Approve' : 'Reject'}`,
+      isDanger: isReject
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.updateLeaveStatus(leaveId, { status, review_comment: `${status} by manager.` });
+      this.showToast(`Leave request #${leaveId} has been ${status.toLowerCase()}!`, 'success');
+      this.loadLeaves();
+      this.loadDashboard();
+    } catch (err) {
+      this.showToast(err.message || 'Failed to update leave', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 5. Change Password Modal & Handler
+  // =========================================================================
+  openChangePasswordModal() {
+    this.closeModals();
+    const form = document.getElementById('form-change-password');
+    if (form) form.reset();
+    const modal = document.getElementById('modal-change-password');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+  }
+
+  async handleChangePassword(e) {
+    e.preventDefault();
+    const oldPwd = document.getElementById('pwd-old').value;
+    const newPwd = document.getElementById('pwd-new').value;
+    const confirmPwd = document.getElementById('pwd-confirm').value;
+
+    if (!oldPwd || !newPwd || !confirmPwd) {
+      this.showToast('Please fill in all password fields', 'warning');
+      return;
+    }
+
+    if (newPwd !== confirmPwd) {
+      this.showToast('New password and confirmation do not match', 'error');
+      return;
+    }
+
+    if (newPwd.length < 6) {
+      this.showToast('New password must be at least 6 characters', 'warning');
+      return;
+    }
+
+    if (newPwd === oldPwd) {
+      this.showToast('New password cannot be identical to old password', 'warning');
+      return;
+    }
+
+    try {
+      await api.changePassword(oldPwd, newPwd, confirmPwd);
+      this.showToast('Password changed successfully!', 'success');
+      this.closeModals();
+      const form = document.getElementById('form-change-password');
+      if (form) form.reset();
+    } catch (err) {
+      this.showToast(err.message || 'Failed to change password', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 6. Crucial Action Confirmation Dialog (Proceed or Exit)
+  // =========================================================================
+  confirmAction({ title, message, badge = "CRUCIAL SYSTEM ACTION", proceedText = "Proceed", isDanger = false }) {
+    return new Promise((resolve) => {
+      this.confirmResolve = resolve;
+      
+      const modal = document.getElementById('modal-confirm-action');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const msgEl = document.getElementById('confirm-modal-message');
+      const badgeEl = document.getElementById('confirm-modal-badge');
+      const proceedBtn = document.getElementById('btn-confirm-proceed');
+      const bannerEl = document.getElementById('confirm-modal-banner');
+      
+      if (titleEl) {
+        titleEl.innerText = title || 'Action Confirmation Required';
+        titleEl.style.color = isDanger ? '#ef4444' : '#f59e0b';
+      }
+      if (msgEl) msgEl.innerHTML = message || 'Are you sure you want to proceed?';
+      if (badgeEl) badgeEl.innerText = badge;
+      
+      if (bannerEl) {
+        if (isDanger) {
+          bannerEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          bannerEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+          if (badgeEl) badgeEl.style.color = '#f87171';
+        } else {
+          bannerEl.style.background = 'rgba(245, 158, 11, 0.1)';
+          bannerEl.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+          if (badgeEl) badgeEl.style.color = '#fbbf24';
+        }
+      }
+
+      if (proceedBtn) {
+        proceedBtn.innerText = proceedText;
+        proceedBtn.className = isDanger ? 'btn btn-danger' : 'btn btn-primary';
+      }
+
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+      }
+    });
+  }
+
+  executeConfirmAction() {
+    const modal = document.getElementById('modal-confirm-action');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+    if (this.confirmResolve) {
+      this.confirmResolve(true);
+      this.confirmResolve = null;
+    }
+  }
+
+  cancelConfirmAction() {
+    const modal = document.getElementById('modal-confirm-action');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+    if (this.confirmResolve) {
+      this.confirmResolve(false);
+      this.confirmResolve = null;
+    }
+  }
+
+  // =========================================================================
+  // 7. Audit Vault View
+  // =========================================================================
+  async loadAuditLogs() {
+    try {
+      const logs = await api.getAuditLogs({ limit: 100 });
+      const tbody = document.getElementById('audit-table-body');
+
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No audit logs recorded yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = logs.map(log => `
+        <tr>
+          <td><span style="font-size:0.8rem; color:var(--text-muted);">${log.timestamp}</span></td>
+          <td><b>${log.username}</b></td>
+          <td><span class="badge badge-primary">${log.action}</span></td>
+          <td><strong>${log.target_entity}</strong></td>
+          <td style="color: #f87171; font-size: 0.8rem;">${log.old_value || '—'}</td>
+          <td style="color: #4ade80; font-size: 0.8rem;">${log.new_value || '—'}</td>
+          <td><code>${log.client_ip}</code></td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      this.showToast('Failed to load audit logs', 'error');
+    }
+  }
+
+  // =========================================================================
+  // Utilities
+  // =========================================================================
+  closeModals() {
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+      el.classList.remove('active');
+      el.style.display = 'none';
+    });
+    if (this.confirmResolve) {
+      this.confirmResolve(false);
+      this.confirmResolve = null;
+    }
+  }
+
+  showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  togglePasswordVisibility(inputId, btnId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (btn) btn.innerText = 'Hide';
+    } else {
+      input.type = 'password';
+      if (btn) btn.innerText = 'Show';
+    }
+  }
+
+  debounce(func, wait) {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(func, wait);
+  }
+}
+
+// 1-Click demo account filler
+function setDemoLogin(employeeId, password) {
+  document.getElementById('login-employee-id').value = employeeId;
+  document.getElementById('login-password').value = password;
+  const toggleBtn = document.getElementById('btn-toggle-password');
+  if (toggleBtn && document.getElementById('login-password').type === 'text') {
+    document.getElementById('login-password').type = 'password';
+    toggleBtn.innerText = 'Show';
+  }
+  document.getElementById('btn-login-submit').click();
+}
+
+// Initialize Application
+const app = new AppController();

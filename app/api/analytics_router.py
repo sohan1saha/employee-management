@@ -1,0 +1,22 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.api.deps import get_current_user, get_user_scope_center
+from app.services.analytics_service import get_dashboard_analytics, get_employee_dashboard_analytics
+from app.models.user import User
+
+router = APIRouter(prefix="/analytics", tags=["Analytics & BI"])
+
+
+@router.get("/summary")
+def get_analytics_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieve workforce KPIs for Admins/Managers or self-service dashboard metrics for Employees."""
+    if current_user.role == "EMPLOYEE" and current_user.employee_id:
+        return get_employee_dashboard_analytics(db, employee_id=current_user.employee_id)
+
+    scoped_center = get_user_scope_center(db, current_user)
+    return get_dashboard_analytics(db, center=scoped_center)
