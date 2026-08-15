@@ -11,6 +11,7 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     revoke_token,
+    revoke_user_sessions,
     validate_password_strength
 )
 from app.core.config import settings
@@ -284,7 +285,10 @@ def change_password(
     current_user.hashed_password = get_password_hash(pwd_data.new_password)
     db.commit()
 
-    # 5. Audit log
+    # 5. Invalidate all existing tokens and sessions for this user
+    revoke_user_sessions(str(current_user.employee_id))
+
+    # 6. Audit log
     record_audit(
         db=db,
         action="PASSWORD_CHANGED",
@@ -292,13 +296,13 @@ def change_password(
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
         role=current_user.role,
-        new_value="Password successfully changed. Active sessions invalidated.",
+        new_value="Password successfully changed. All active sessions and refresh tokens invalidated.",
         client_ip=client_ip,
         user_agent=user_agent,
         request_id=req_id
     )
 
-    return {"message": "Password changed successfully."}
+    return {"message": "Password changed successfully. All active sessions invalidated."}
 
 
 @router.post("/logout")

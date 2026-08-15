@@ -257,7 +257,11 @@ def test_password_policy_and_change_flow():
     }, headers=headers)
     assert success_change.status_code == 200
 
-    # 3. Login with new password succeeds
+    # 3. Verify old session token is immediately invalidated
+    old_session_check = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert old_session_check.status_code == 401
+
+    # 4. Login with new password succeeds
     new_login = client.post("/api/auth/login", json={"employee_id": 1025102, "password": strong_new_pass})
     assert new_login.status_code == 200
     new_token = new_login.json()["access_token"]

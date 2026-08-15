@@ -111,9 +111,19 @@ def decode_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         jti = payload.get("jti")
-        # Check if session/token was revoked
+        sub = payload.get("sub")
+        iat = payload.get("iat")
+
+        # 1. Check if token JTI was individually revoked
         if jti and is_token_revoked(jti):
             return None
+
+        # 2. Check if all sessions for user were invalidated (e.g., password change / logout all)
+        if sub and iat:
+            revoked_after = get_user_session_revoked_timestamp(str(sub))
+            if revoked_after is not None and iat < revoked_after:
+                return None
+
         return payload
     except JWTError:
         return None
@@ -139,3 +149,20 @@ def revoke_token(jti: str, ttl_seconds: int = 86400 * 7):
 def is_token_revoked(jti: str) -> bool:
     """Check whether a session/token JTI has been revoked."""
     return cache.get(f"revoked_token:{jti}") is not None
+
+
+def revoke_user_sessions(user_identifier: str, ttl_seconds: int = 86400 * 7):
+    """Invalidate all active sessions and refresh tokens for a user (e.g. on password change)."""
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    cache.set(f"user_session_revocation:{user_identifier}", now_ts, ttl_seconds=ttl_seconds)
+
+
+def get_user_session_revoked_timestamp(user_identifier: str) -> Optional[int]:
+    """Retrieve timestamp after which all issued user tokens are invalid."""
+    val = cache.get(f"user_session_revocation:{user_identifier}")
+    if val is not None:
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return None
+    return None
