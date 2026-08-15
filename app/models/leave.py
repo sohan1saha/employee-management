@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -9,20 +9,24 @@ class LeaveRequest(Base):
     __tablename__ = "leave_requests"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.eid", ondelete="CASCADE"), nullable=False, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.eid"), nullable=False, index=True)
     leave_type = Column(String(30), nullable=False)  # SICK, CASUAL, PTO, MATERNITY, UNPAID
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     days_count = Column(Integer, nullable=False)
     reason = Column(Text, nullable=False)
-    status = Column(String(20), default="PENDING", nullable=False)  # PENDING, APPROVED, REJECTED
-    applied_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(String(20), default="PENDING", nullable=False, index=True)  # PENDING, APPROVED, REJECTED
+    applied_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     reviewed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     review_comment = Column(Text, nullable=True)
 
     # Relationships
     employee = relationship("Employee", back_populates="leave_requests")
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+    __table_args__ = (
+        Index("ix_leave_emp_status", "employee_id", "status"),
+    )
 
     def to_dict(self):
         return {

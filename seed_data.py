@@ -1,6 +1,7 @@
 """Seed fresh demo data with structured continuous Employee IDs across Corporate HQ and regional centers."""
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
+from decimal import Decimal
 from app.core.database import SessionLocal, engine, Base
 import app.models  # Register models
 from app.models.user import User
@@ -17,7 +18,7 @@ def seed_database(reset: bool = True):
     if reset:
         print("[*] Clearing existing tables...")
         Base.metadata.drop_all(bind=engine)
-    
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
@@ -32,7 +33,7 @@ def seed_database(reset: bool = True):
                 ename="Eleanor Vance",
                 ecen="Corporate HQ",
                 epos="Chief Executive Administrator",
-                esal=180000.0,
+                esal=Decimal('180000.00'),
                 edoj=date(2024, 1, 10),
                 email="eleanor.vance@staffsync.internal",
                 status="ACTIVE"
@@ -43,7 +44,7 @@ def seed_database(reset: bool = True):
                 ename="Sara Chen",
                 ecen="Bangalore",
                 epos="Engineering Manager",
-                esal=135000.0,
+                esal=Decimal('135000.00'),
                 edoj=date(2023, 3, 15),
                 email="sara.chen@staffsync.internal",
                 status="ACTIVE"
@@ -53,7 +54,7 @@ def seed_database(reset: bool = True):
                 ename="Alex Turner",
                 ecen="Bangalore",
                 epos="Senior Software Engineer",
-                esal=95000.0,
+                esal=Decimal('95000.00'),
                 edoj=date(2025, 2, 1),
                 email="alex.turner@staffsync.internal",
                 status="ACTIVE"
@@ -63,7 +64,7 @@ def seed_database(reset: bool = True):
                 ename="David Miller",
                 ecen="Bangalore",
                 epos="Lead UI/UX Designer",
-                esal=85000.0,
+                esal=Decimal('85000.00'),
                 edoj=date(2026, 1, 15),
                 email="david.miller@staffsync.internal",
                 status="ACTIVE"
@@ -74,7 +75,7 @@ def seed_database(reset: bool = True):
                 ename="Vikram Malhotra",
                 ecen="Delhi",
                 epos="Operations Manager",
-                esal=125000.0,
+                esal=Decimal('125000.00'),
                 edoj=date(2023, 5, 10),
                 email="vikram.malhotra@staffsync.internal",
                 status="ACTIVE"
@@ -84,7 +85,7 @@ def seed_database(reset: bool = True):
                 ename="Priya Sharma",
                 ecen="Delhi",
                 epos="Financial Analyst",
-                esal=82000.0,
+                esal=Decimal('82000.00'),
                 edoj=date(2024, 4, 12),
                 email="priya.sharma@staffsync.internal",
                 status="ACTIVE"
@@ -94,7 +95,7 @@ def seed_database(reset: bool = True):
                 ename="Karan Mehra",
                 ecen="Delhi",
                 epos="QA Automation Lead",
-                esal=88000.0,
+                esal=Decimal('88000.00'),
                 edoj=date(2025, 6, 20),
                 email="karan.mehra@staffsync.internal",
                 status="ACTIVE"
@@ -105,7 +106,7 @@ def seed_database(reset: bool = True):
                 ename="Ananya Roy",
                 ecen="Mumbai",
                 epos="Regional Branch Manager",
-                esal=128000.0,
+                esal=Decimal('128000.00'),
                 edoj=date(2023, 8, 1),
                 email="ananya.roy@staffsync.internal",
                 status="ACTIVE"
@@ -115,7 +116,7 @@ def seed_database(reset: bool = True):
                 ename="Rohan Verma",
                 ecen="Mumbai",
                 epos="HR Operations Lead",
-                esal=80000.0,
+                esal=Decimal('80000.00'),
                 edoj=date(2024, 9, 18),
                 email="rohan.verma@staffsync.internal",
                 status="ACTIVE"
@@ -126,7 +127,7 @@ def seed_database(reset: bool = True):
                 ename="Siddharth Sen",
                 ecen="Kolkata",
                 epos="Cloud Solutions Architect",
-                esal=110000.0,
+                esal=Decimal('110000.00'),
                 edoj=date(2025, 11, 5),
                 email="siddharth.sen@staffsync.internal",
                 status="ACTIVE"
@@ -215,7 +216,7 @@ def seed_database(reset: bool = True):
 
         print("[*] Generating Initial Payroll Records...")
         # 3. Generate Payroll for Current Month
-        current_month = datetime.utcnow().strftime("%Y-%m")
+        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
         for emp in sample_employees:
             bd = calculate_salary_breakdown(emp.esal)
             payroll = PayrollRecord(
@@ -275,6 +276,7 @@ def seed_database(reset: bool = True):
             AuditLog(
                 user_id=admin_user.id,
                 username=f"#{admin_user.employee_id}",
+                role=admin_user.role,
                 action="SYSTEM_INITIALIZED",
                 target_entity="System Core",
                 new_value="StaffSync 360 database schema and central codes initialized.",
@@ -283,6 +285,7 @@ def seed_database(reset: bool = True):
             AuditLog(
                 user_id=admin_user.id,
                 username=f"#{admin_user.employee_id}",
+                role=admin_user.role,
                 action="EMPLOYEE_CREATED",
                 target_entity="Employee #9924101",
                 new_value="Name: Eleanor Vance, Center: Corporate HQ, Pos: Chief Executive Administrator",
@@ -291,6 +294,7 @@ def seed_database(reset: bool = True):
             AuditLog(
                 user_id=admin_user.id,
                 username=f"#{admin_user.employee_id}",
+                role=admin_user.role,
                 action="PAYROLL_BATCH_GENERATED",
                 target_entity=f"Month: {current_month}",
                 new_value=f"Processed payroll for {len(sample_employees)} staff members across centers.",

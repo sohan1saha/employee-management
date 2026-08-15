@@ -402,12 +402,12 @@ alembic revision --autogenerate -m "add_custom_fields"
 
 ## 🧪 Running Automated Tests
 
-Execute the full 10-suite integration test suite with:
+Execute the full 11-suite integration test suite with:
 ```bash
 pytest tests/test_hrms.py -v
 ```
 
-All 9 test suites validate authentication, self-service password updates, multi-center scoping isolation, salary calculations, continuous ID generation, and ReportLab PDF rendering.
+All 11 test suites validate authentication, refresh token rotation, brute-force account lockout, password policy enforcement, soft deletion with data retention, Decimal payroll precision, multi-center scoping isolation, continuous ID generation, and ReportLab PDF rendering.
 
 ---
 
@@ -416,3 +416,4 @@ All 9 test suites validate authentication, self-service password updates, multi-
 **Sohan Saha**
 * GitHub: [@sohan1saha](https://github.com/sohan1saha)
 * Repository: [https://github.com/sohan1saha/employee-management](https://github.com/sohan1saha/employee-management)
+

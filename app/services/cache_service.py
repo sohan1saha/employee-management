@@ -10,12 +10,23 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, date
+from decimal import Decimal
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # In-memory LRU/TTL fallback dictionary
 _LOCAL_CACHE = {}
+
+
+def _json_serial(obj):
+    """Custom JSON serializer for Decimal, Date, and DateTime objects."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 class CacheService:
@@ -65,7 +76,12 @@ class CacheService:
 
     def set(self, key: str, value: Any, ttl_seconds: int = 300) -> bool:
         """Store item in Redis or local in-memory cache with TTL."""
-        serialized = json.dumps(value)
+        try:
+            serialized = json.dumps(value, default=_json_serial)
+        except Exception as e:
+            logger.error(f"JSON serialization error in cache: {e}")
+            return False
+
         if self.is_redis_available and self.redis_client:
             try:
                 self.redis_client.setex(key, ttl_seconds, serialized)
@@ -79,33 +95,35 @@ class CacheService:
         return True
 
     def delete(self, key: str) -> bool:
-        """Delete specific cache key."""
+        """Invalidate a specific cache key."""
         if self.is_redis_available and self.redis_client:
             try:
                 self.redis_client.delete(key)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Redis delete failed: {e}")
+
         _LOCAL_CACHE.pop(key, None)
         return True
 
-    def invalidate_prefix(self, prefix: str) -> int:
-        """Invalidate all keys matching a prefix (e.g. 'analytics:*')."""
-        count = 0
+    def invalidate_prefix(self, prefix: str):
+        """Invalidate all keys matching a prefix across Redis and in-memory store."""
         if self.is_redis_available and self.redis_client:
             try:
-                keys = self.redis_client.keys(f"{prefix}*")
-                if keys:
-                    count += self.redis_client.delete(*keys)
+                cursor = '0'
+                while cursor != 0:
+                    cursor, keys = self.redis_client.scan(cursor=cursor, match=f"{prefix}*", count=100)
+                    if keys:
+                        self.redis_client.delete(*keys)
+                    if cursor == 0 or cursor == '0':
+                        break
             except Exception as e:
-                logger.warning(f"Redis prefix invalidation failed: {e}")
+                logger.warning(f"Redis prefix invalidation error: {e}")
 
-        # Local fallback flush for matching prefix
-        keys_to_remove = [k for k in list(_LOCAL_CACHE.keys()) if k.startswith(prefix)]
-        for k in keys_to_remove:
+        # Invalidate in local fallback
+        keys_to_del = [k for k in _LOCAL_CACHE.keys() if k.startswith(prefix)]
+        for k in keys_to_del:
             _LOCAL_CACHE.pop(k, None)
-            count += 1
-        return count
 
 
-# Singleton instance
+# Singleton application cache instance
 cache = CacheService()

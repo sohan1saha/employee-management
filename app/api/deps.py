@@ -1,12 +1,22 @@
-from typing import Generator, Optional, List
+import uuid
+from typing import Optional, List
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_token
 from app.models.user import User
+from app.models.employee import Employee
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+def get_request_id(request: Request) -> str:
+    """Extract or generate correlation request ID."""
+    req_id = request.headers.get("X-Request-ID")
+    if not req_id:
+        req_id = str(uuid.uuid4())
+    return req_id
 
 
 def get_current_user(
@@ -15,13 +25,11 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """Extract and validate the currently authenticated user from Bearer Token or Cookie."""
-    # Check Header token first, then fallback to cookie
     auth_token = token
     if not auth_token:
         auth_token = request.cookies.get("access_token")
 
     if not auth_token:
-        # Check Authorization header manually if needed
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             auth_token = auth_header.split(" ")[1]
@@ -33,11 +41,11 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(auth_token)
-    if not payload:
+    payload = decode_token(auth_token)
+    if not payload or payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token.",
+            detail="Invalid, expired, or revoked access token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -61,7 +69,13 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is deactivated.",
+            detail="User account has been deactivated.",
+        )
+
+    if user.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Account is temporarily locked due to excessive failed login attempts. Try again later.",
         )
 
     return user
@@ -80,12 +94,44 @@ def require_roles(allowed_roles: List[str]):
 
 
 def get_user_scope_center(db: Session, user: User) -> Optional[str]:
-    """Return the center name if the user is scoped to a specific center (e.g. MANAGER).
-    Returns None for unrestricted roles (e.g. ADMIN).
-    """
+    """Return the center name if the user is scoped to a specific center (e.g. MANAGER)."""
     if user.role == "MANAGER" and user.employee_id:
-        from app.models.employee import Employee
         mgr_emp = db.query(Employee).filter(Employee.eid == user.employee_id).first()
         if mgr_emp and mgr_emp.ecen:
             return mgr_emp.ecen
     return None
+
+
+def validate_resource_access(db: Session, current_user: User, target_employee_id: int) -> Employee:
+    """
+    Object-Level Authorization & IDOR Protection:
+    Ensures that the current user is authorized to read/modify the requested employee ID.
+    """
+    target_emp = db.query(Employee).filter(Employee.eid == target_employee_id).first()
+    if not target_emp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee record #{target_employee_id} not found."
+        )
+
+    if current_user.role == "ADMIN":
+        return target_emp
+
+    if current_user.role == "MANAGER":
+        scoped_center = get_user_scope_center(db, current_user)
+        if scoped_center and target_emp.ecen != scoped_center:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. You are only authorized to access records in the '{scoped_center}' branch."
+            )
+        return target_emp
+
+    if current_user.role == "EMPLOYEE":
+        if target_emp.eid != current_user.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You can only view or manage your own personal employee records."
+            )
+        return target_emp
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")

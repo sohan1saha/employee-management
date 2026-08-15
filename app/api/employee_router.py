@@ -1,13 +1,14 @@
 from typing import List, Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from app.core.database import get_db
 from app.models.employee import Employee
 from app.models.user import User
 from app.schemas.employee_schema import EmployeeCreate, EmployeeUpdate, EmployeeResponse
-from app.api.deps import get_current_user, require_roles, get_user_scope_center
+from app.api.deps import get_current_user, require_roles, get_user_scope_center, validate_resource_access, get_request_id
 from app.services.audit_service import record_audit
 from app.services.cache_service import cache
 
@@ -19,10 +20,15 @@ def list_employees(
     search: Optional[str] = Query(None, description="Search by name, ID, or position"),
     center: Optional[str] = Query(None, description="Filter by center/branch"),
     status: Optional[str] = Query(None, description="Filter by status (ACTIVE, ON_LEAVE, TERMINATED)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieve list of employees. Employees see only themselves, managers only their center."""
+    """
+    Retrieve list of employees with multi-center scoping and pagination.
+    Employees see only themselves; managers only their assigned center.
+    """
     query = db.query(Employee)
 
     if current_user.role == "EMPLOYEE" and current_user.employee_id:
@@ -48,7 +54,8 @@ def list_employees(
     if status and status != "ALL":
         query = query.filter(Employee.status == status)
 
-    employees = query.order_by(Employee.eid.asc()).all()
+    offset = (page - 1) * page_size
+    employees = query.order_by(Employee.eid.asc()).offset(offset).limit(page_size).all()
     return [emp.to_dict() for emp in employees]
 
 
@@ -85,50 +92,55 @@ def get_next_recommended_employee_id(db: Session, center: str, doj_str: Optional
     """
     Generate next recommended continuous Employee ID following pattern:
     [Center Code (2 digits)][Year of Joining (2 digits)][Sequential Main ID (3+ digits)]
-    Example: Bangalore (10) + 2026 (26) + 101 => 1026101
+    Uses atomic max lookup within the specific partition to prevent collisions.
     """
-    from datetime import datetime
-    year_code = "26"
+    now = datetime.now(timezone.utc)
+    year_code = str(now.year)[-2:]
     if doj_str:
         try:
             year_val = datetime.strptime(doj_str[:10], "%Y-%m-%d").year
             year_code = str(year_val)[-2:]
         except Exception:
-            year_code = str(datetime.utcnow().year)[-2:]
+            pass
+
+    center_code = get_center_code(center)
+    prefix_str = f"{center_code}{year_code}"
+    prefix_num = int(prefix_str)
+
+    min_range = prefix_num * 1000 + 100
+    max_range = prefix_num * 1000 + 999
+
+    # Find highest assigned ID in this prefix partition
+    highest_eid = db.query(func.max(Employee.eid)).filter(
+        Employee.eid >= min_range,
+        Employee.eid <= max_range
+    ).scalar()
+
+    if highest_eid:
+        return highest_eid + 1
     else:
-        year_code = str(datetime.utcnow().year)[-2:]
-
-    c_code = get_center_code(center)
-    prefix = f"{c_code}{year_code}"
-
-    # Query all existing employee IDs
-    eids = [e[0] for e in db.query(Employee.eid).all()]
-    matching_eids = [eid for eid in eids if str(eid).startswith(prefix) and len(str(eid)) >= 7]
-
-    if matching_eids:
-        next_eid = max(matching_eids) + 1
-    else:
-        next_eid = int(f"{prefix}101")
-
-    return next_eid
+        # Default first employee in this partition
+        return prefix_num * 1000 + 101
 
 
 @router.get("/next-id")
-def get_next_employee_id(
-    center: Optional[str] = Query(None, description="Center name e.g. Bangalore"),
-    doj: Optional[str] = Query(None, description="Date of joining YYYY-MM-DD"),
+def get_next_id(
+    center: str = Query(..., description="Employee Center name e.g. Bangalore, Delhi"),
+    doj: Optional[str] = Query(None, description="Date of Joining (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN", "MANAGER"]))
 ):
-    """Calculate and return next recommended continuous employee ID following [CenterCode][YY][Seq] pattern."""
+    """Retrieve auto-recommended continuous Employee ID."""
     scoped_center = get_user_scope_center(db, current_user)
-    effective_center = scoped_center or center or "Bangalore"
-    next_id = get_next_recommended_employee_id(db, effective_center, doj)
+    selected_center = scoped_center if scoped_center else center
+
+    recommended_id = get_next_recommended_employee_id(db, selected_center, doj)
+    center_code = get_center_code(selected_center)
     return {
-        "next_id": next_id,
-        "center": effective_center,
-        "center_code": get_center_code(effective_center),
-        "pattern": f"[{get_center_code(effective_center)}][YY][Sequence]"
+        "next_id": recommended_id,
+        "center": selected_center,
+        "center_code": center_code,
+        "pattern": f"{center_code} + YY + Sequence"
     }
 
 
@@ -137,44 +149,26 @@ def get_centers_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieve distinct list of active centers (scoped for managers and employees)."""
-    if current_user.role == "EMPLOYEE" and current_user.employee_id:
-        emp = db.query(Employee).filter(Employee.eid == current_user.employee_id).first()
-        return [emp.ecen] if emp and emp.ecen else []
-
+    """Return distinct centers available to user."""
     scoped_center = get_user_scope_center(db, current_user)
     if scoped_center:
         return [scoped_center]
+
     centers = db.query(Employee.ecen).distinct().all()
-    return [c[0] for c in centers if c[0]]
+    results = sorted(list(set([c[0] for c in centers if c[0]])))
+    if not results:
+        results = ["Bangalore", "Delhi", "Mumbai", "Kolkata"]
+    return results
 
 
-@router.get("/{eid}")
+@router.get("/{eid}", response_model=dict)
 def get_employee(
     eid: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieve detailed record of a single employee."""
-    emp = db.query(Employee).filter(Employee.eid == eid).first()
-    if not emp:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Employee with ID {eid} not found"
-        )
-
-    if current_user.role == "EMPLOYEE" and current_user.employee_id != eid:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. You are only authorized to view your own employee profile."
-        )
-
-    scoped_center = get_user_scope_center(db, current_user)
-    if scoped_center and emp.ecen != scoped_center:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. You are only authorized to view employees in the '{scoped_center}' center."
-        )
+    """Retrieve individual employee record with IDOR verification."""
+    emp = validate_resource_access(db, current_user, eid)
     return emp.to_dict()
 
 
@@ -185,7 +179,11 @@ def create_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN", "MANAGER"]))
 ):
-    """Create a new employee record (Admin or Manager)."""
+    """Create a new employee record with input validation and audit logging."""
+    req_id = get_request_id(request)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent", "Unknown")
+
     scoped_center = get_user_scope_center(db, current_user)
     if scoped_center and emp_in.ecen != scoped_center:
         raise HTTPException(
@@ -202,8 +200,6 @@ def create_employee(
         )
 
     email = emp_in.email or f"emp{emp_in.eid}@staffsync.internal"
-    
-    # Check if email exists
     existing_email = db.query(Employee).filter(Employee.email == email).first()
     if existing_email:
         email = f"emp{emp_in.eid}_{emp_in.ename.lower().replace(' ', '')}@staffsync.internal"
@@ -222,21 +218,20 @@ def create_employee(
     db.commit()
     db.refresh(employee)
 
-    # Automatic Audit Logging
-    client_ip = request.client.host if request.client else "127.0.0.1"
     record_audit(
         db=db,
         action="EMPLOYEE_CREATED",
         target_entity=f"Employee #{employee.eid}",
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
-        new_value=f"Name: {employee.ename}, Center: {employee.ecen}, Pos: {employee.epos}, Sal: {employee.esal}",
-        client_ip=client_ip
+        role=current_user.role,
+        new_value=f"Name: {employee.ename}, Center: {employee.ecen}, Pos: {employee.epos}, Sal: ₹{employee.esal}",
+        client_ip=client_ip,
+        user_agent=user_agent,
+        request_id=req_id
     )
 
-    # Invalidate cached analytics
     cache.invalidate_prefix("analytics:")
-
     return employee.to_dict()
 
 
@@ -248,25 +243,25 @@ def update_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN", "MANAGER"]))
 ):
-    """Update employee details with change tracking in audit logs."""
-    emp = db.query(Employee).filter(Employee.eid == eid).first()
-    if not emp:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Employee with ID {eid} not found"
-        )
+    """Update employee details with field authorization and audit logging."""
+    req_id = get_request_id(request)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent", "Unknown")
+
+    emp = validate_resource_access(db, current_user, eid)
 
     scoped_center = get_user_scope_center(db, current_user)
     if scoped_center:
-        if emp.ecen != scoped_center:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. You are only authorized to edit employees in the '{scoped_center}' center."
-            )
         if emp_in.ecen and emp_in.ecen != scoped_center:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. You cannot transfer employees out of the '{scoped_center}' center."
+            )
+        # Field authorization: Manager cannot alter salary
+        if emp_in.esal is not None and emp_in.esal != emp.esal and current_user.role != "ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. Only Administrators can adjust employee compensation."
             )
 
     changes_old = []
@@ -283,18 +278,19 @@ def update_employee(
     db.commit()
     db.refresh(emp)
 
-    # Audit log if anything changed
     if changes_new:
-        client_ip = request.client.host if request.client else "127.0.0.1"
         record_audit(
             db=db,
             action="EMPLOYEE_UPDATED",
             target_entity=f"Employee #{eid}",
             user_id=current_user.id,
             username=f"#{current_user.employee_id}",
+            role=current_user.role,
             old_value=", ".join(changes_old),
             new_value=", ".join(changes_new),
-            client_ip=client_ip
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_id=req_id
         )
         cache.invalidate_prefix("analytics:")
 
@@ -308,7 +304,14 @@ def delete_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN"]))
 ):
-    """Delete an employee record (Admin only)."""
+    """
+    Soft-delete / deactivate employee record (Admin only).
+    Preserves all historical payroll and leave records while revoking user access.
+    """
+    req_id = get_request_id(request)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent", "Unknown")
+
     emp = db.query(Employee).filter(Employee.eid == eid).first()
     if not emp:
         raise HTTPException(
@@ -316,22 +319,33 @@ def delete_employee(
             detail=f"Employee with ID {eid} not found"
         )
 
-    emp_snapshot = f"Name: {emp.ename}, Center: {emp.ecen}, Pos: {emp.epos}, Sal: {emp.esal}"
-    db.delete(emp)
+    # Soft-delete: Mark as TERMINATED
+    old_status = emp.status
+    emp.status = "TERMINATED"
+
+    # Deactivate linked user account
+    linked_user = db.query(User).filter(User.employee_id == eid).first()
+    if linked_user:
+        linked_user.is_active = False
+
     db.commit()
 
-    # Record Audit Log
-    client_ip = request.client.host if request.client else "127.0.0.1"
     record_audit(
         db=db,
-        action="EMPLOYEE_DELETED",
-        target_entity=f"Employee #{eid}",
+        action="EMPLOYEE_DEACTIVATED_TERMINATED",
+        target_entity=f"Employee #{eid} ({emp.ename})",
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
-        old_value=emp_snapshot,
-        client_ip=client_ip
+        role=current_user.role,
+        old_value=f"Status: {old_status}",
+        new_value="Status: TERMINATED, User Account: Deactivated",
+        client_ip=client_ip,
+        user_agent=user_agent,
+        request_id=req_id
     )
 
     cache.invalidate_prefix("analytics:")
-
-    return {"message": f"Employee record #{eid} successfully deleted"}
+    return {
+        "message": f"Employee #{eid} has been deactivated (status set to TERMINATED). Historical records preserved.",
+        "status": "TERMINATED"
+    }

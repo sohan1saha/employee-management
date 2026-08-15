@@ -24,14 +24,21 @@ class PasswordChangeRequest(BaseModel):
     confirm_password: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
+    expires_in_minutes: int = 15
     user: dict
 
 
 class UserResponse(UserBase):
     id: int
+    is_locked: bool = False
     created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
