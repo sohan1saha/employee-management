@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index, event
 from app.core.database import Base
 
 
@@ -7,7 +7,7 @@ class AuditLog(Base):
     """
     Append-Only Audit Log Record:
     Captures actor, action, diffs, client IP, user agent, and request correlation ID.
-    Modifications and deletions are prohibited at both application and ORM levels.
+    Modifications and deletions are strictly blocked via SQLAlchemy ORM event listeners.
     """
     __tablename__ = "audit_logs"
 
@@ -43,3 +43,19 @@ class AuditLog(Base):
             "request_id": self.request_id,
             "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S") if self.timestamp else None
         }
+
+
+# =============================================================================
+# ORM-Level Append-Only Immutability Enforcement
+# =============================================================================
+
+def _block_audit_update(mapper, connection, target):
+    raise PermissionError("CRITICAL AUDIT INTEGRITY ERROR: AuditLog records are append-only and cannot be updated.")
+
+
+def _block_audit_delete(mapper, connection, target):
+    raise PermissionError("CRITICAL AUDIT INTEGRITY ERROR: AuditLog records are append-only and cannot be deleted.")
+
+
+event.listen(AuditLog, "before_update", _block_audit_update)
+event.listen(AuditLog, "before_delete", _block_audit_delete)

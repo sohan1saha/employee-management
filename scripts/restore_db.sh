@@ -11,6 +11,11 @@ if [ -z "${BACKUP_FILE}" ] || [ ! -f "${BACKUP_FILE}" ]; then
     exit 1
 fi
 
+if [ -z "${POSTGRES_PASSWORD}" ]; then
+    echo "[-] CRITICAL ERROR: POSTGRES_PASSWORD environment variable is required."
+    exit 1
+fi
+
 echo "[!] WARNING: This will restore and overwrite the database from ${BACKUP_FILE}."
 echo "[+] Starting database restore at $(date)..."
 
@@ -27,7 +32,7 @@ if [[ "${BACKUP_FILE}" == *.enc ]]; then
 fi
 
 # Restore PostgreSQL database
-gunzip -c "${TEMP_FILE}" | PGPASSWORD="${POSTGRES_PASSWORD:-staffsync_secure_pass}" pg_restore \
+gunzip -c "${TEMP_FILE}" | PGPASSWORD="${POSTGRES_PASSWORD}" pg_restore \
     -h "${POSTGRES_HOST:-db}" \
     -U "${POSTGRES_USER:-staffsync_admin}" \
     -d "${POSTGRES_DB:-staffsync_db}" \

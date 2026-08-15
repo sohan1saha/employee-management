@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class EmployeeBase(BaseModel):
-    eid: int = Field(..., ge=1, description="Unique Positive Employee ID")
+    eid: Optional[int] = Field(None, ge=1, description="Unique Positive Employee ID (Auto-generated if omitted)")
     ename: str = Field(..., min_length=2, max_length=100, description="Employee Name")
     ecen: str = Field(..., min_length=2, max_length=60, description="Employee Center/Branch")
     epos: str = Field(..., min_length=2, max_length=80, description="Employee Position")
@@ -30,6 +30,7 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeResponse(EmployeeBase):
+    eid: int
     email: str
     created_at: Optional[str] = None
     updated_at: Optional[str] = None

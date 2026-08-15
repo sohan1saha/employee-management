@@ -3,18 +3,19 @@
 StaffSync 360 - Enterprise Configuration & Environment Settings
 ==============================================================================
 Loads and validates all application configuration from environment variables.
+Fails startup immediately if required production secrets or configs are missing.
 """
 
 import os
 from typing import List, Union
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "StaffSync 360 - Enterprise HRMS & Payroll"
     API_V1_STR: str = "/api"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "development"  # "development", "staging", "production"
     DEBUG: bool = True
 
     # Security & JWT Tokens
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     ACCOUNT_LOCKOUT_MINUTES: int = 15
 
     # Cookie Configuration
-    COOKIE_SECURE: bool = False                 # Set to True when HTTPS is enabled
+    COOKIE_SECURE: bool = False                 # Set to True in production (enforced via validator)
     COOKIE_HTTPONLY: bool = True
     COOKIE_SAMESITE: str = "lax"
 
@@ -62,16 +63,35 @@ class Settings(BaseSettings):
 
     @field_validator("SECRET_KEY")
     @classmethod
-    def validate_secret_key(cls, v: str, info) -> str:
-        env = os.getenv("ENVIRONMENT", "development").lower()
-        if env == "production" and "development" in v:
-            raise ValueError(
-                "CRITICAL SECURITY ERROR: Default development SECRET_KEY detected in production environment! "
-                "You must provide a secure SECRET_KEY through environment variables."
-            )
+    def validate_secret_key(cls, v: str) -> str:
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long for secure HS256 hashing.")
         return v
+
+    @model_validator(mode="after")
+    def validate_production_readiness(self) -> "Settings":
+        """Strict fail-safe: Fails application startup if production environment lacks enterprise security."""
+        is_prod = self.ENVIRONMENT.lower() in ["production", "prod"]
+        if is_prod:
+            # 1. Require strong non-development secret
+            if "development" in self.SECRET_KEY.lower() or "change_in_production" in self.SECRET_KEY.lower():
+                raise RuntimeError(
+                    "FATAL STARTUP ERROR: Insecure or default SECRET_KEY detected in PRODUCTION! "
+                    "You must supply a high-entropy SECRET_KEY (min 32 characters) via environment variable or secret manager."
+                )
+
+            # 2. Production must use production-grade database (PostgreSQL)
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise RuntimeError(
+                    "FATAL STARTUP ERROR: SQLite is prohibited in production mode. "
+                    "Configure a production PostgreSQL instance via DATABASE_URL."
+                )
+
+            # 3. Enforce cookie security & disable debug mode
+            self.COOKIE_SECURE = True
+            self.DEBUG = False
+
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

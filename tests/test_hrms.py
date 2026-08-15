@@ -1,5 +1,6 @@
 import os
 import sys
+import concurrent.futures
 from decimal import Decimal
 
 # Ensure root project directory is in python path
@@ -10,10 +11,12 @@ from datetime import date
 from fastapi.testclient import TestClient
 from main import app
 from app.core.database import SessionLocal, Base, engine
+from app.core.config import Settings
 from app.models.employee import Employee
 from app.models.user import User
 from app.models.payroll import PayrollRecord
 from app.models.leave import LeaveRequest
+from app.models.audit import AuditLog
 from app.core.security import get_password_hash
 from seed_data import seed_database
 from app.services.payroll_service import calculate_salary_breakdown, generate_payslip_pdf, generate_payroll_for_month
@@ -265,7 +268,6 @@ def test_password_policy_and_change_flow():
         "new_password": "employee123",
         "confirm_password": "employee123"
     }, headers={"Authorization": f"Bearer {new_token}"})
-    # Ignore policy check on revert for demo compatibility if needed or test with valid
     assert revert_res.status_code in [200, 400]
 
 
@@ -290,7 +292,6 @@ def test_token_refresh_and_revocation():
 
 def test_account_lockout_after_failed_attempts():
     """Verify account locks out after 5 consecutive failed login attempts."""
-    # Attempt 5 wrong logins
     for i in range(5):
         fail_res = client.post("/api/auth/login", json={"employee_id": 2025103, "password": "WrongPassword999!"})
         assert fail_res.status_code in [401, 429]
@@ -300,7 +301,7 @@ def test_account_lockout_after_failed_attempts():
     assert lock_res.status_code == 429
     assert "locked" in lock_res.json()["detail"].lower()
 
-    # Reset lockout in database for subsequent tests
+    # Reset lockout in database
     db = SessionLocal()
     user = db.query(User).filter(User.employee_id == 2025103).first()
     if user:
@@ -329,3 +330,85 @@ def test_system_health_and_caching_layer():
     assert cache.get("test_key_emp") == {"emp_count": 42}
     cache.invalidate_prefix("test_key")
     assert cache.get("test_key_emp") is None
+
+
+# =============================================================================
+# Production Hardening Test Suites
+# =============================================================================
+
+def test_concurrent_employee_id_allocation():
+    """Verify atomic continuous Employee ID allocation under concurrent thread execution."""
+    login_res = client.post("/api/auth/login", json={"employee_id": 9924101, "password": "admin123"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    def create_concurrent_emp(idx):
+        payload = {
+            "ename": f"Concurrent Emp {idx}",
+            "ecen": "Bangalore",
+            "epos": "Concurrency Engineer",
+            "esal": "80000.00",
+            "edoj": "2026-03-01"
+        }
+        res = client.post("/api/employees", json=payload, headers=headers)
+        return res.json()["eid"]
+
+    # Concurrently create 6 employees across worker threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(create_concurrent_emp, i) for i in range(6)]
+        generated_ids = [f.result() for f in futures]
+
+    # Verify all generated IDs are strictly unique (0 collisions)
+    assert len(generated_ids) == len(set(generated_ids))
+    for eid in generated_ids:
+        assert str(eid).startswith("10")
+
+
+def test_orm_audit_immutability():
+    """Verify ORM-level event listeners prevent tampering with or deleting AuditLog records."""
+    db = SessionLocal()
+    audit = db.query(AuditLog).first()
+    assert audit is not None
+
+    # 1. Attempting UPDATE must raise PermissionError
+    with pytest.raises(PermissionError) as exc_update:
+        audit.old_value = "Tampered Old Value"
+        db.commit()
+    db.rollback()
+    assert "append-only" in str(exc_update.value).lower()
+
+    # 2. Attempting DELETE must raise PermissionError
+    with pytest.raises(PermissionError) as exc_delete:
+        db.delete(audit)
+        db.commit()
+    db.rollback()
+    assert "append-only" in str(exc_delete.value).lower()
+    db.close()
+
+
+def test_orm_paid_payroll_immutability():
+    """Verify ORM-level event listener prevents deleting finalized/paid payroll records."""
+    db = SessionLocal()
+    paid_payroll = db.query(PayrollRecord).filter(PayrollRecord.payment_status == "PAID").first()
+    assert paid_payroll is not None
+
+    # Attempting to delete paid payroll record must raise PermissionError
+    with pytest.raises(PermissionError) as exc_delete:
+        db.delete(paid_payroll)
+        db.commit()
+    db.rollback()
+    assert "cannot be physically deleted" in str(exc_delete.value)
+    db.close()
+
+
+def test_production_secret_fail_startup():
+    """Verify application fails startup with fatal error if production environment has default secrets."""
+    # Test setting ENVIRONMENT=production with default secret
+    with pytest.raises(RuntimeError) as exc_info:
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="development_jwt_secret_key_change_in_production_staffsync360_min32chars",
+            DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+        )
+    assert "FATAL STARTUP ERROR" in str(exc_info.value)

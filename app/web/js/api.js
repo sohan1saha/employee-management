@@ -1,5 +1,9 @@
 /**
- * StaffSync 360 - API Client Layer
+ * ==============================================================================
+ * StaffSync 360 - Enterprise API Client Layer
+ * ==============================================================================
+ * Handles Bearer token headers, HttpOnly cookie credentials, and automatic
+ * silent JWT access token refresh on 401 Unauthorized responses.
  */
 
 const API_BASE = '/api';
@@ -7,24 +11,65 @@ const API_BASE = '/api';
 class ApiClient {
   constructor() {
     this.token = localStorage.getItem('access_token') || null;
+    this.refreshToken = localStorage.getItem('refresh_token') || null;
     this.user = JSON.parse(localStorage.getItem('user_info') || 'null');
+    this.isRefreshing = false;
+    this.refreshSubscribers = [];
   }
 
-  setSession(token, user) {
-    this.token = token;
+  setSession(accessToken, refreshToken, user) {
+    this.token = accessToken;
+    if (refreshToken) {
+      this.refreshToken = refreshToken;
+      localStorage.setItem('refresh_token', refreshToken);
+    }
     this.user = user;
-    localStorage.setItem('access_token', token);
+    localStorage.setItem('access_token', accessToken);
     localStorage.setItem('user_info', JSON.stringify(user));
   }
 
   clearSession() {
     this.token = null;
+    this.refreshToken = null;
     this.user = null;
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_info');
   }
 
-  async request(endpoint, options = {}) {
+  onRefreshed(token) {
+    this.refreshSubscribers.map(cb => cb(token));
+    this.refreshSubscribers = [];
+  }
+
+  subscribeTokenRefresh(cb) {
+    this.refreshSubscribers.push(cb);
+  }
+
+  async refreshAccessToken() {
+    try {
+      const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ refresh_token: this.refreshToken })
+      });
+
+      if (!response.ok) {
+        throw new Error('Refresh failed');
+      }
+
+      const data = await response.json();
+      this.setSession(data.access_token, data.refresh_token, data.user);
+      return data.access_token;
+    } catch (err) {
+      this.clearSession();
+      window.dispatchEvent(new Event('auth:unauthorized'));
+      throw err;
+    }
+  }
+
+  async request(endpoint, options = {}, isRetry = false) {
     const url = `${API_BASE}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
@@ -36,16 +81,49 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(url, { ...options, headers });
-      
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include' // Sends HttpOnly / SameSite secure cookies
+      });
+
+      // Handle 401 Unauthorized with automatic silent token refresh
       if (response.status === 401) {
-        const errData = await response.json().catch(() => ({}));
         if (endpoint.startsWith('/auth/login')) {
-          throw new Error(errData.detail || 'Incorrect username or password');
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Incorrect Employee ID or password');
         }
-        this.clearSession();
-        window.dispatchEvent(new Event('auth:unauthorized'));
-        throw new Error(errData.detail || 'Session expired. Please log in again.');
+
+        if (endpoint.startsWith('/auth/refresh') || isRetry) {
+          this.clearSession();
+          window.dispatchEvent(new Event('auth:unauthorized'));
+          throw new Error('Session expired. Please sign in again.');
+        }
+
+        // Silent token refresh flow
+        if (!this.isRefreshing) {
+          this.isRefreshing = true;
+          try {
+            const newToken = await this.refreshAccessToken();
+            this.isRefreshing = false;
+            this.onRefreshed(newToken);
+            return await this.request(endpoint, options, true);
+          } catch (refreshErr) {
+            this.isRefreshing = false;
+            throw refreshErr;
+          }
+        } else {
+          // Wait for concurrent refresh to finish
+          return new Promise((resolve, reject) => {
+            this.subscribeTokenRefresh(async (newToken) => {
+              try {
+                resolve(await this.request(endpoint, options, true));
+              } catch (err) {
+                reject(err);
+              }
+            });
+          });
+        }
       }
 
       if (!response.ok) {
@@ -53,7 +131,7 @@ class ApiClient {
         throw new Error(errData.detail || `Request failed with status ${response.status}`);
       }
 
-      // Handle raw stream/blob for PDF downloads
+      // Handle PDF Stream/Blob
       if (response.headers.get('content-type')?.includes('application/pdf')) {
         return await response.blob();
       }
@@ -65,13 +143,13 @@ class ApiClient {
     }
   }
 
-  // Auth Endpoints
+  // --- Auth Endpoints ---
   async login(employee_id, password) {
     const res = await this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ employee_id: parseInt(employee_id), password })
     });
-    this.setSession(res.access_token, res.user);
+    this.setSession(res.access_token, res.refresh_token, res.user);
     return res;
   }
 
@@ -94,7 +172,7 @@ class ApiClient {
     });
   }
 
-  // Employee Endpoints
+  // --- Employee Endpoints ---
   async getEmployees(params = {}) {
     const query = new URLSearchParams(params).toString();
     return await this.request(`/employees${query ? '?' + query : ''}`);
@@ -133,12 +211,12 @@ class ApiClient {
     return await this.request('/employees/centers/list');
   }
 
-  // Analytics Endpoints
+  // --- Analytics Endpoints ---
   async getAnalytics() {
     return await this.request('/analytics/summary');
   }
 
-  // Payroll Endpoints
+  // --- Payroll Endpoints ---
   async getPayroll(params = {}) {
     const query = new URLSearchParams(params).toString();
     return await this.request(`/payroll${query ? '?' + query : ''}`);
@@ -148,6 +226,12 @@ class ApiClient {
     return await this.request('/payroll/generate', {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  }
+
+  async approvePayroll(recordId) {
+    return await this.request(`/payroll/${recordId}/approve`, {
+      method: 'POST'
     });
   }
 
@@ -163,7 +247,7 @@ class ApiClient {
     window.URL.revokeObjectURL(blobUrl);
   }
 
-  // Leave Endpoints
+  // --- Leave Endpoints ---
   async getLeaves(params = {}) {
     const query = new URLSearchParams(params).toString();
     return await this.request(`/leaves${query ? '?' + query : ''}`);
@@ -183,7 +267,7 @@ class ApiClient {
     });
   }
 
-  // Audit Endpoints
+  // --- Audit Endpoints ---
   async getAuditLogs(params = {}) {
     const query = new URLSearchParams(params).toString();
     return await this.request(`/audit/logs${query ? '?' + query : ''}`);

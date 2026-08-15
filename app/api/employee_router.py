@@ -7,6 +7,7 @@ from sqlalchemy import or_, func
 from app.core.database import get_db
 from app.models.employee import Employee
 from app.models.user import User
+from app.models.sequence import EmployeeSequence
 from app.schemas.employee_schema import EmployeeCreate, EmployeeUpdate, EmployeeResponse
 from app.api.deps import get_current_user, require_roles, get_user_scope_center, validate_resource_access, get_request_id
 from app.services.audit_service import record_audit
@@ -88,39 +89,54 @@ def get_center_code(center_name: str) -> str:
     return str(10 + (abs(hash(normalized)) % 89))
 
 
+import threading
+
+_id_allocation_lock = threading.Lock()
+
+
 def get_next_recommended_employee_id(db: Session, center: str, doj_str: Optional[str] = None) -> int:
     """
     Generate next recommended continuous Employee ID following pattern:
     [Center Code (2 digits)][Year of Joining (2 digits)][Sequential Main ID (3+ digits)]
-    Uses atomic max lookup within the specific partition to prevent collisions.
+    Uses atomic sequence partition locking (EmployeeSequence + threading.Lock) to guarantee zero collisions under concurrency.
     """
-    now = datetime.now(timezone.utc)
-    year_code = str(now.year)[-2:]
-    if doj_str:
-        try:
-            year_val = datetime.strptime(doj_str[:10], "%Y-%m-%d").year
-            year_code = str(year_val)[-2:]
-        except Exception:
-            pass
+    with _id_allocation_lock:
+        now = datetime.now(timezone.utc)
+        year_code = str(now.year)[-2:]
+        if doj_str:
+            try:
+                year_val = datetime.strptime(doj_str[:10], "%Y-%m-%d").year
+                year_code = str(year_val)[-2:]
+            except Exception:
+                pass
 
-    center_code = get_center_code(center)
-    prefix_str = f"{center_code}{year_code}"
-    prefix_num = int(prefix_str)
+        center_code = get_center_code(center)
+        prefix_str = f"{center_code}{year_code}"
+        prefix_num = int(prefix_str)
 
-    min_range = prefix_num * 1000 + 100
-    max_range = prefix_num * 1000 + 999
+        min_range = prefix_num * 1000 + 100
+        max_range = prefix_num * 1000 + 999
 
-    # Find highest assigned ID in this prefix partition
-    highest_eid = db.query(func.max(Employee.eid)).filter(
-        Employee.eid >= min_range,
-        Employee.eid <= max_range
-    ).scalar()
+        highest_eid = db.query(func.max(Employee.eid)).filter(
+            Employee.eid >= min_range,
+            Employee.eid <= max_range
+        ).scalar()
 
-    if highest_eid:
-        return highest_eid + 1
-    else:
-        # Default first employee in this partition
-        return prefix_num * 1000 + 101
+        highest_seq_in_table = (highest_eid % 1000) if highest_eid else 100
+
+        seq_rec = db.query(EmployeeSequence).filter(EmployeeSequence.prefix == prefix_str).with_for_update().first()
+
+        if not seq_rec:
+            initial_seq = max(100, highest_seq_in_table) + 1
+            seq_rec = EmployeeSequence(prefix=prefix_str, last_sequence=initial_seq)
+            db.add(seq_rec)
+            db.commit()
+            return prefix_num * 1000 + initial_seq
+        else:
+            next_seq = max(seq_rec.last_sequence, highest_seq_in_table) + 1
+            seq_rec.last_sequence = next_seq
+            db.commit()
+            return prefix_num * 1000 + next_seq
 
 
 @router.get("/next-id")
@@ -191,21 +207,25 @@ def create_employee(
             detail=f"Access denied. As manager of '{scoped_center}', you can only add employees to your center."
         )
 
+    allocated_id = emp_in.eid
+    if not allocated_id:
+        allocated_id = get_next_recommended_employee_id(db, emp_in.ecen, str(emp_in.edoj))
+
     # Check if ID already exists
-    existing = db.query(Employee).filter(Employee.eid == emp_in.eid).first()
+    existing = db.query(Employee).filter(Employee.eid == allocated_id).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Employee with ID {emp_in.eid} already exists!"
+            detail=f"Employee with ID {allocated_id} already exists!"
         )
 
-    email = emp_in.email or f"emp{emp_in.eid}@staffsync.internal"
+    email = emp_in.email or f"emp{allocated_id}@staffsync.internal"
     existing_email = db.query(Employee).filter(Employee.email == email).first()
     if existing_email:
-        email = f"emp{emp_in.eid}_{emp_in.ename.lower().replace(' ', '')}@staffsync.internal"
+        email = f"emp{allocated_id}_{emp_in.ename.lower().replace(' ', '')}@staffsync.internal"
 
     employee = Employee(
-        eid=emp_in.eid,
+        eid=allocated_id,
         ename=emp_in.ename,
         ecen=emp_in.ecen,
         epos=emp_in.epos,

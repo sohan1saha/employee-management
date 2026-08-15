@@ -400,14 +400,26 @@ alembic revision --autogenerate -m "add_custom_fields"
 
 ---
 
-## 🧪 Running Automated Tests
+## 🧪 Running Automated Tests & Security Audits
 
-Execute the full 11-suite integration test suite with:
+### 1. Pytest Integration Suite & Coverage (16 Test Suites)
 ```bash
-pytest tests/test_hrms.py -v
+pytest tests/ -v --cov=app --cov-report=term-missing
 ```
 
-All 11 test suites validate authentication, refresh token rotation, brute-force account lockout, password policy enforcement, soft deletion with data retention, Decimal payroll precision, multi-center scoping isolation, continuous ID generation, and ReportLab PDF rendering.
+The 16 test suites validate:
+* **Authentication & Tokens:** 15m JWT lifetime, 7d refresh token rotation, session revocation, brute-force lockout (5 attempts $\rightarrow$ 15m).
+* **Cryptographic & Password Policies:** Password complexity enforcement and missing production secret startup crash protection.
+* **Financial Precision & Immutability:** Pure Decimal salary calculations and ORM-level modification/deletion rejection for paid payroll records.
+* **Audit Trail Integrity:** Immutable append-only audit log enforcement via SQLAlchemy event listeners.
+* **Concurrency & ID Allocation:** Multi-threaded stress testing proving atomic, collision-free sequential employee ID generation.
+* **Multi-Tenant Scoping:** Cross-center access boundaries and IDOR object-level protection.
+* **Disaster Recovery & Data Protection:** Automated PostgreSQL/SQLite dump, compression, and restore verification tests.
+
+### 2. AST Security Vulnerability Scan (Bandit)
+```bash
+bandit -r app/ -ll --exclude app/web
+```
 
 ---
 
@@ -416,4 +428,5 @@ All 11 test suites validate authentication, refresh token rotation, brute-force 
 **Sohan Saha**
 * GitHub: [@sohan1saha](https://github.com/sohan1saha)
 * Repository: [https://github.com/sohan1saha/employee-management](https://github.com/sohan1saha/employee-management)
+
 

@@ -4,6 +4,11 @@
 # ==============================================================================
 set -e
 
+if [ -z "${POSTGRES_PASSWORD}" ]; then
+    echo "[-] CRITICAL ERROR: POSTGRES_PASSWORD environment variable is required."
+    exit 1
+fi
+
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILENAME="staffsync_backup_${TIMESTAMP}.sql.gz"
@@ -15,7 +20,7 @@ mkdir -p "${BACKUP_DIR}"
 echo "[+] Starting automated database backup at $(date)..."
 
 # Dump and gzip compress PostgreSQL database
-PGPASSWORD="${POSTGRES_PASSWORD:-staffsync_secure_pass}" pg_dump \
+PGPASSWORD="${POSTGRES_PASSWORD}" pg_dump \
     -h "${POSTGRES_HOST:-db}" \
     -U "${POSTGRES_USER:-staffsync_admin}" \
     -d "${POSTGRES_DB:-staffsync_db}" \

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, UniqueConstraint, Index, event
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -9,6 +9,7 @@ class PayrollRecord(Base):
     """
     Payroll & Statutory Compensation Record:
     Stores high-precision monetary values with lifecycle state tracking.
+    Finalized records (PAID / APPROVED) are protected against deletion at ORM level.
     """
     __tablename__ = "payroll_records"
 
@@ -60,3 +61,18 @@ class PayrollRecord(Base):
             "approved_at": self.approved_at.strftime("%Y-%m-%d %H:%M:%S") if self.approved_at else None,
             "generated_at": self.generated_at.strftime("%Y-%m-%d %H:%M:%S") if self.generated_at else None
         }
+
+
+# =============================================================================
+# ORM-Level Deletion Prevention for Finalized Records
+# =============================================================================
+
+def _block_finalized_payroll_delete(mapper, connection, target):
+    if target.payment_status in ("PAID", "APPROVED"):
+        raise PermissionError(
+            f"CRITICAL FINANCIAL INTEGRITY ERROR: Payroll record #{target.id} is finalized ({target.payment_status}) "
+            "and cannot be physically deleted. Financial audit records must remain immutable."
+        )
+
+
+event.listen(PayrollRecord, "before_delete", _block_finalized_payroll_delete)
