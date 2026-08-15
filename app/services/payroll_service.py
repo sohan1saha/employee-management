@@ -101,7 +101,7 @@ def generate_payroll_for_month(
             existing.pf_deduction = breakdown["pf_deduction"]
             existing.tax_deduction = breakdown["tax_deduction"]
             existing.net_salary = breakdown["net_salary"]
-            existing.payment_status = "PAID"
+            existing.payment_status = "CALCULATED"
             existing.generated_at = now
             created_records.append(existing)
         else:
@@ -115,7 +115,7 @@ def generate_payroll_for_month(
                 pf_deduction=breakdown["pf_deduction"],
                 tax_deduction=breakdown["tax_deduction"],
                 net_salary=breakdown["net_salary"],
-                payment_status="PAID",
+                payment_status="CALCULATED",
                 generated_at=now
             )
             db.add(record)

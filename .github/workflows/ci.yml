@@ -73,7 +73,7 @@ jobs:
       - name: Run Pip Audit Dependency Check
         run: |
           pip install -r requirements.txt
-          pip-audit || true
+          pip-audit --desc on
 
   # Job 4: Integration Tests against Real PostgreSQL 16 & Redis 7
   test:
@@ -167,7 +167,7 @@ jobs:
         with:
           image-ref: 'staffsync360:latest'
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'

@@ -61,15 +61,19 @@ echo "[✓] Encrypted backup created: ${ENCRYPTED_PATH} ($(du -h "${ENCRYPTED_PA
 if [ -n "${S3_BUCKET}" ]; then
     echo "[+] Uploading encrypted backup to off-host S3 storage: s3://${S3_BUCKET}/"
     if command -v aws >/dev/null 2>&1; then
-        aws s3 cp "${ENCRYPTED_PATH}" "s3://${S3_BUCKET}/backups/$(basename "${ENCRYPTED_PATH}")"
+        aws s3 cp "${ENCRYPTED_PATH}" "s3://${S3_BUCKET}/backups/$(basename "${ENCRYPTED_PATH}")" \
+            || { echo "[-] CRITICAL: AWS S3 off-site backup upload failed." >&2; exit 1; }
         echo "[✓] Off-host S3 upload complete."
     else
-        echo "[!] WARNING: 'aws' CLI not found. Falling back to curl/rclone if configured."
+        echo "[-] CRITICAL ERROR: 'aws' CLI is required when S3_BUCKET is configured." >&2
+        exit 1
     fi
 elif [ -n "${REMOTE_BACKUP_URL}" ]; then
     echo "[+] Pushing encrypted backup to off-host webhook/remote endpoint..."
-    curl -sf -X POST -H "Authorization: Bearer ${REMOTE_BACKUP_TOKEN}" \
-         -F "file=@${ENCRYPTED_PATH}" "${REMOTE_BACKUP_URL}" || echo "[!] Remote push notification sent."
+    curl -f -s -S --retry 3 --retry-delay 2 \
+         -X POST -H "Authorization: Bearer ${REMOTE_BACKUP_TOKEN}" \
+         -F "file=@${ENCRYPTED_PATH}" "${REMOTE_BACKUP_URL}" \
+         || { echo "[-] CRITICAL: Remote webhook off-site backup upload failed." >&2; exit 1; }
     echo "[✓] Off-host remote push completed."
 else
     echo "[*] No S3_BUCKET or REMOTE_BACKUP_URL configured. Backup retained in local volume: ${BACKUP_DIR}"

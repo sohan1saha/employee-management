@@ -3,7 +3,8 @@
 StaffSync 360 - High-Performance In-Memory & Redis Caching Service
 ==============================================================================
 Provides transparent Redis caching with automatic in-memory fallback for
-high-frequency endpoints (analytics summary, center listings).
+generic analytics/listings, and mandatory distributed Redis in production
+for security/auth revocation.
 """
 
 import json
@@ -16,14 +17,14 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# In-memory LRU/TTL fallback dictionary
+# In-memory LRU/TTL fallback dictionary (Development / Test harness only)
 _LOCAL_CACHE = {}
 
 
 def _json_serial(obj):
-    """Custom JSON serializer for Decimal, Date, and DateTime objects."""
+    """Custom JSON serializer preserving high-precision Decimal strings and ISO dates."""
     if isinstance(obj, Decimal):
-        return float(obj)
+        return str(obj)  # Preserves exact decimal precision without float binary conversion
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
@@ -33,11 +34,11 @@ class CacheService:
     def __init__(self):
         self.redis_client = None
         self.is_redis_available = False
+        self.env = os.getenv("ENVIRONMENT", "development").lower()
         self._init_redis()
 
     def _init_redis(self):
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        env = os.getenv("ENVIRONMENT", "development").lower()
         try:
             import redis
             self.redis_client = redis.from_url(
@@ -46,20 +47,22 @@ class CacheService:
                 socket_connect_timeout=1.5,
                 decode_responses=True
             )
-            # Ping test
             self.redis_client.ping()
             self.is_redis_available = True
             logger.info("Redis cache connected successfully.")
         except Exception as e:
             self.is_redis_available = False
             self.redis_client = None
-            if env in ["production", "prod"]:
+            if self.env in ["production", "prod"]:
                 logger.critical(f"FATAL: Redis connection failed in PRODUCTION mode: {e}")
                 raise RuntimeError(
                     f"CRITICAL PRODUCTION ERROR: Redis connection failed at {redis_url}. "
                     "Redis is mandatory in production for distributed token revocation and session security."
                 ) from e
-            logger.debug(f"Redis unavailable, using local memory cache fallback. ({e})")
+            logger.debug(f"Redis unavailable, using local memory cache fallback for development. ({e})")
+
+    def _is_auth_key(self, key: str) -> bool:
+        return key.startswith("revoked_token:") or key.startswith("user_session_revocation:")
 
     def get(self, key: str) -> Optional[Any]:
         """Retrieve item from Redis or local in-memory cache."""
@@ -70,8 +73,14 @@ class CacheService:
                     return json.loads(data)
             except Exception as e:
                 logger.warning(f"Redis get failed: {e}")
+                if self.env in ["production", "prod"] and self._is_auth_key(key):
+                    raise RuntimeError(f"FATAL: Redis get failed for auth state in production: {e}") from e
 
-        # Local fallback check
+        # In production, do not allow local fallback for critical security keys
+        if self.env in ["production", "prod"] and self._is_auth_key(key):
+            raise RuntimeError("CRITICAL: Redis is mandatory for authentication state in production mode.")
+
+        # Local fallback check for development
         item = _LOCAL_CACHE.get(key)
         if item:
             val, expiry = item
@@ -95,8 +104,14 @@ class CacheService:
                 return True
             except Exception as e:
                 logger.warning(f"Redis set failed: {e}")
+                if self.env in ["production", "prod"] and self._is_auth_key(key):
+                    raise RuntimeError(f"FATAL: Redis set failed for auth state in production: {e}") from e
 
-        # Local fallback store
+        # In production, do not allow local fallback for critical security keys
+        if self.env in ["production", "prod"] and self._is_auth_key(key):
+            raise RuntimeError("CRITICAL: Redis is mandatory for authentication state in production mode.")
+
+        # Local fallback store for development
         expiry = time.time() + ttl_seconds if ttl_seconds else None
         _LOCAL_CACHE[key] = (value, expiry)
         return True
@@ -106,6 +121,7 @@ class CacheService:
         if self.is_redis_available and self.redis_client:
             try:
                 self.redis_client.delete(key)
+                return True
             except Exception as e:
                 logger.warning(f"Redis delete failed: {e}")
 

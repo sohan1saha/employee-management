@@ -300,9 +300,21 @@ def test_token_refresh_and_revocation():
     second_refresh = client.post("/api/auth/refresh", json={"refresh_token": rotated_refresh_token})
     assert second_refresh.status_code == 200
 
-    # 4. Logout and verify session revocation
-    logout_res = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {second_refresh.json()['access_token']}"})
+    # 4. Logout with cookies and bearer token
+    logout_res = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {second_refresh.json()['access_token']}"},
+        cookies={"refresh_token": rotated_refresh_token}
+    )
     assert logout_res.status_code == 200
+
+    # 5. Verify access token is fully revoked
+    me_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {second_refresh.json()['access_token']}"})
+    assert me_res.status_code == 401
+
+    # 6. Verify refresh token is fully revoked
+    refresh_after_logout = client.post("/api/auth/refresh", json={"refresh_token": rotated_refresh_token})
+    assert refresh_after_logout.status_code == 401
 
 
 def test_payroll_state_machine_transitions():

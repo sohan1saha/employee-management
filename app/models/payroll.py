@@ -27,7 +27,7 @@ class PayrollRecord(Base):
     net_salary = Column(Numeric(12, 2), nullable=False)
 
     # Lifecycle State: DRAFT -> CALCULATED -> APPROVED -> PAID
-    payment_status = Column(String(20), default="PAID", nullable=False, index=True)
+    payment_status = Column(String(20), default="DRAFT", nullable=False, index=True)
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
