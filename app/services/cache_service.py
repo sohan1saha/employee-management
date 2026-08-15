@@ -37,6 +37,7 @@ class CacheService:
 
     def _init_redis(self):
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        env = os.getenv("ENVIRONMENT", "development").lower()
         try:
             import redis
             self.redis_client = redis.from_url(
@@ -52,6 +53,12 @@ class CacheService:
         except Exception as e:
             self.is_redis_available = False
             self.redis_client = None
+            if env in ["production", "prod"]:
+                logger.critical(f"FATAL: Redis connection failed in PRODUCTION mode: {e}")
+                raise RuntimeError(
+                    f"CRITICAL PRODUCTION ERROR: Redis connection failed at {redis_url}. "
+                    "Redis is mandatory in production for distributed token revocation and session security."
+                ) from e
             logger.debug(f"Redis unavailable, using local memory cache fallback. ({e})")
 
     def get(self, key: str) -> Optional[Any]:

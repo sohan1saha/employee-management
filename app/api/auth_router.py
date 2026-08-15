@@ -312,20 +312,52 @@ def logout(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user)
 ):
-    """Invalidate session cookies and revoke tokens."""
+    """
+    Invalidate session cookies and fully revoke both access and refresh token JTIs in cache.
+    """
     req_id = get_request_id(request)
     client_ip = request.client.host if request.client else "127.0.0.1"
 
-    # Revoke tokens if provided
+    # 1. Collect all candidate tokens to revoke (Header Bearer + Cookies)
+    candidate_tokens = []
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        decoded = decode_token(token)
-        if decoded and decoded.get("jti"):
-            revoke_token(decoded["jti"])
+        candidate_tokens.append(auth_header.split(" ")[1])
 
-    response.delete_cookie(key="access_token")
-    response.delete_cookie(key="refresh_token")
+    cookie_access = request.cookies.get("access_token")
+    if cookie_access:
+        candidate_tokens.append(cookie_access)
+
+    cookie_refresh = request.cookies.get("refresh_token")
+    if cookie_refresh:
+        candidate_tokens.append(cookie_refresh)
+
+    # 2. Revoke each token's JTI
+    for tok in candidate_tokens:
+        try:
+            from jose import jwt as jose_jwt
+            raw_payload = jose_jwt.decode(tok, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
+            jti = raw_payload.get("jti")
+            if jti:
+                revoke_token(jti)
+        except Exception:
+            pass
+
+    # 3. Clear HttpOnly secure cookies
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=settings.COOKIE_SECURE,
+        httponly=settings.COOKIE_HTTPONLY,
+        samesite=settings.COOKIE_SAMESITE
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        path="/",
+        secure=settings.COOKIE_SECURE,
+        httponly=settings.COOKIE_HTTPONLY,
+        samesite=settings.COOKIE_SAMESITE
+    )
 
     if current_user:
         record_audit(
@@ -339,4 +371,4 @@ def logout(
             request_id=req_id
         )
 
-    return {"message": "Successfully logged out."}
+    return {"message": "Successfully logged out. All tokens revoked and cookies cleared."}

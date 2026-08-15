@@ -125,3 +125,30 @@ def test_encrypted_backup_and_decrypted_restore(tmp_path):
     conn.close()
 
     assert emp_count > 0
+
+
+def test_backup_and_restore_shell_scripts_syntax():
+    """Verify backup and restore shell scripts exist with mandatory safety checks."""
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    backup_script = os.path.join(base_dir, "scripts", "backup_db.sh")
+    restore_script = os.path.join(base_dir, "scripts", "restore_db.sh")
+    entrypoint_script = os.path.join(base_dir, "scripts", "docker_entrypoint.sh")
+
+    assert os.path.exists(backup_script), "backup_db.sh must exist in scripts/"
+    assert os.path.exists(restore_script), "restore_db.sh must exist in scripts/"
+    assert os.path.exists(entrypoint_script), "docker_entrypoint.sh must exist in scripts/"
+
+    with open(backup_script, "r", encoding="utf-8") as f:
+        backup_content = f.read()
+    assert "ENCRYPTION_PASSPHRASE" in backup_content
+    assert "gpg" in backup_content
+    assert "set -e" in backup_content
+
+    with open(restore_script, "r", encoding="utf-8") as f:
+        restore_content = f.read()
+    assert "ENCRYPTION_PASSPHRASE" in restore_content
+    assert "pg_restore" in restore_content
+
+    with open(entrypoint_script, "r", encoding="utf-8") as f:
+        entrypoint_content = f.read()
+    assert "alembic upgrade head" in entrypoint_content

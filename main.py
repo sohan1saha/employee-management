@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -57,15 +57,22 @@ app.add_middleware(
 
 
 # =============================================================================
-# Middleware: Request ID & Enterprise Security Headers
+# Middleware: Request ID, HTTPS Redirection & Enterprise Security Headers
 # =============================================================================
 @app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
-    # 1. Request ID Generation / Propagation
+    # 1. Force HTTPS redirect in production
+    if settings.ENVIRONMENT == "production":
+        proto = request.headers.get("x-forwarded-proto", "").lower()
+        if proto == "http" and not request.url.path.startswith("/.well-known"):
+            https_url = request.url.replace(scheme="https")
+            return RedirectResponse(url=str(https_url), status_code=status.HTTP_301_MOVED_PERMANENTLY)
+
+    # 2. Request ID Generation / Propagation
     req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     start_time = time.time()
 
-    # 2. Payload size check (Max 10MB)
+    # 3. Payload size check (Max 10MB)
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > 10 * 1024 * 1024:
         return JSONResponse(

@@ -87,7 +87,14 @@ class Settings(BaseSettings):
                     "Configure a production PostgreSQL instance via DATABASE_URL."
                 )
 
-            # 3. Enforce cookie security & disable debug mode
+            # 3. Require Redis for distributed token revocation and session blacklisting
+            if not self.REDIS_URL or self.REDIS_URL.strip() == "":
+                raise RuntimeError(
+                    "FATAL STARTUP ERROR: REDIS_URL is mandatory in production for distributed token revocation, "
+                    "brute-force rate limiting, and session security."
+                )
+
+            # 4. Enforce cookie security & disable debug mode
             self.COOKIE_SECURE = True
             self.DEBUG = False
 
