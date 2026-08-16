@@ -24,17 +24,32 @@ class AttendanceRecord(Base):
     employee = relationship("Employee", backref="attendance_records")
 
     def to_dict(self) -> dict:
+        def fmt_utc(dt: datetime | None) -> str | None:
+            if not dt:
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.isoformat()
+
+        elapsed_sec = None
+        if self.clock_in and self.clock_out:
+            cin = self.clock_in if self.clock_in.tzinfo else self.clock_in.replace(tzinfo=timezone.utc)
+            cout = self.clock_out if self.clock_out.tzinfo else self.clock_out.replace(tzinfo=timezone.utc)
+            elapsed_sec = max(0, int((cout - cin).total_seconds()))
+
         return {
             "id": self.id,
             "employee_id": self.employee_id,
             "employee_name": self.employee.ename if self.employee else None,
             "center": self.employee.ecen if self.employee else None,
             "work_date": self.work_date.isoformat() if self.work_date else None,
-            "clock_in": self.clock_in.isoformat() if self.clock_in else None,
-            "clock_out": self.clock_out.isoformat() if self.clock_out else None,
+            "clock_in": fmt_utc(self.clock_in),
+            "clock_out": fmt_utc(self.clock_out),
+            "elapsed_seconds": elapsed_sec,
             "total_hours": float(self.total_hours) if self.total_hours is not None else 0.0,
             "status": self.status,
             "ip_address": self.ip_address,
             "notes": self.notes,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": fmt_utc(self.created_at)
         }
+

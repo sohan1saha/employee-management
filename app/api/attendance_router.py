@@ -34,19 +34,19 @@ def clock_in(
     now_utc = datetime.now(timezone.utc)
     client_ip = request.client.host if request.client else "127.0.0.1"
 
-    # Check if already clocked in today
-    existing = db.query(AttendanceRecord).filter(
+    # Check if user already has an unclosed active clock-in session
+    active_session = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == current_user.employee_id,
-        AttendanceRecord.work_date == today
+        AttendanceRecord.clock_out.is_(None)
     ).first()
 
-    if existing and not existing.clock_out:
+    if active_session:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You are already clocked in for today. Please clock out before checking in again."
+            detail="You are currently clocked in. Please clock out before starting a new shift."
         )
 
-    # Determine status (LATE if checking in after 10:30 AM local / UTC equivalent)
+    # Determine status
     status_str = "PRESENT"
 
     record = AttendanceRecord(
@@ -84,20 +84,18 @@ def clock_out(
     current_user: User = Depends(get_current_user)
 ):
     """Record employee daily clock-out and compute total working hours."""
-    today = date.today()
     now_utc = datetime.now(timezone.utc)
     client_ip = request.client.host if request.client else "127.0.0.1"
 
     record = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == current_user.employee_id,
-        AttendanceRecord.work_date == today,
         AttendanceRecord.clock_out.is_(None)
     ).order_by(AttendanceRecord.id.desc()).first()
 
     if not record:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No active clock-in session found for today. Please clock in first."
+            detail="No active clock-in session found. Please clock in first."
         )
 
     record.clock_out = now_utc
@@ -105,8 +103,8 @@ def clock_out(
     if clock_in_time.tzinfo is None:
         clock_in_time = clock_in_time.replace(tzinfo=timezone.utc)
 
-    elapsed_seconds = (now_utc - clock_in_time).total_seconds()
-    hours = max(0.0, elapsed_seconds / 3600.0)
+    elapsed_seconds = max(0.0, (now_utc - clock_in_time).total_seconds())
+    hours = elapsed_seconds / 3600.0
     record.total_hours = Decimal(str(round(hours, 2)))
 
     if hours < 4.5:
@@ -117,7 +115,7 @@ def clock_out(
         record.status = "PRESENT"
 
     if payload.notes:
-        record.notes = f"{record.notes} | Clock-out note: {payload.notes}" if record.notes else payload.notes
+        record.notes = f"{record.notes} | Clock-out: {payload.notes}" if record.notes else payload.notes
 
     db.commit()
     db.refresh(record)
@@ -157,12 +155,19 @@ def get_attendance_summary(
     on_time_rate = round((on_time_count / total_days) * 100.0, 1) if total_days > 0 else 100.0
 
     today = date.today()
-    today_rec = db.query(AttendanceRecord).filter(
+    # Check active un-clocked-out record first
+    active_rec = db.query(AttendanceRecord).filter(
+        AttendanceRecord.employee_id == target_eid,
+        AttendanceRecord.clock_out.is_(None)
+    ).order_by(AttendanceRecord.id.desc()).first()
+
+    latest_today_rec = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == target_eid,
         AttendanceRecord.work_date == today
     ).order_by(AttendanceRecord.id.desc()).first()
 
-    is_clocked_in = today_rec is not None and today_rec.clock_out is None
+    today_rec = active_rec if active_rec else latest_today_rec
+    is_clocked_in = active_rec is not None
 
     return {
         "total_days_present": total_days,

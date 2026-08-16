@@ -415,6 +415,8 @@ class AppController {
           }
         }
 
+        // Live attendance tracking card update
+        this.loadAttendanceData();
         return;
       }
 
@@ -1444,6 +1446,16 @@ class AppController {
   // =========================================================================
   // 7. Attendance Operations & Live Clock-In/Out
   // =========================================================================
+  parseUtcDate(dateStr) {
+    if (!dateStr) return new Date();
+    let s = String(dateStr).trim();
+    if (!s.endsWith('Z') && !s.includes('+') && !/[0-9]-[0-9]{2}:[0-9]{2}$/.test(s)) {
+      s = s.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+
   async loadAttendanceData() {
     try {
       const summary = await api.getAttendanceSummary();
@@ -1490,41 +1502,58 @@ class AppController {
       if (btnIn) btnIn.disabled = true;
       if (btnOut) btnOut.disabled = false;
 
-      const clockInTime = new Date(summary.today_record.clock_in);
+      const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
       if (details) {
         details.innerText = `Clocked in at ${clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       }
       this.startAttendanceStopwatch(summary.today_record.clock_in);
     } else if (summary.today_record && summary.today_record.clock_out) {
+      if (this.attendanceStopwatchInterval) {
+        clearInterval(this.attendanceStopwatchInterval);
+        this.attendanceStopwatchInterval = null;
+      }
+
       badge.innerText = 'SHIFT COMPLETED';
       badge.style.background = 'rgba(59, 130, 246, 0.2)';
       badge.style.color = '#60a5fa';
       if (btnIn) btnIn.disabled = false;
       if (btnOut) btnOut.disabled = true;
+
+      const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
+      const clockOutTime = this.parseUtcDate(summary.today_record.clock_out);
       if (details) {
-        details.innerText = `Completed ${summary.today_record.total_hours} hrs today`;
+        details.innerText = `Shift ended at ${clockOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${summary.today_record.total_hours} hrs logged)`;
       }
-      if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
-      const totalSec = Math.floor(summary.today_record.total_hours * 3600);
+
+      let totalSec = summary.today_record.elapsed_seconds;
+      if (totalSec === undefined || totalSec === null) {
+        totalSec = Math.max(0, Math.floor((clockOutTime.getTime() - clockInTime.getTime()) / 1000));
+      }
       const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
       const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
       const secs = String(totalSec % 60).padStart(2, '0');
       timer.innerText = `${hrs}:${mins}:${secs}`;
     } else {
+      if (this.attendanceStopwatchInterval) {
+        clearInterval(this.attendanceStopwatchInterval);
+        this.attendanceStopwatchInterval = null;
+      }
       badge.innerText = 'NOT CLOCKED IN';
       badge.style.background = 'rgba(100, 116, 139, 0.2)';
       badge.style.color = '#94a3b8';
       if (btnIn) btnIn.disabled = false;
       if (btnOut) btnOut.disabled = true;
       if (details) details.innerText = 'Shift not started';
-      if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
       timer.innerText = '00:00:00';
     }
   }
 
   startAttendanceStopwatch(clockInIso) {
-    if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
-    const clockInTime = new Date(clockInIso).getTime();
+    if (this.attendanceStopwatchInterval) {
+      clearInterval(this.attendanceStopwatchInterval);
+      this.attendanceStopwatchInterval = null;
+    }
+    const clockInTime = this.parseUtcDate(clockInIso).getTime();
 
     const updateTimer = () => {
       const now = Date.now();
@@ -1561,6 +1590,11 @@ class AppController {
     );
     if (!confirmed) return;
 
+    if (this.attendanceStopwatchInterval) {
+      clearInterval(this.attendanceStopwatchInterval);
+      this.attendanceStopwatchInterval = null;
+    }
+
     try {
       const res = await api.clockOut();
       this.showToast(`Clocked out successfully! Logged ${res.total_hours} hrs today.`, 'success');
@@ -1583,8 +1617,8 @@ class AppController {
       }
 
       tbody.innerHTML = history.map(rec => {
-        const inTime = rec.clock_in ? new Date(rec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-        const outTime = rec.clock_out ? new Date(rec.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '<span style="color:#34d399; font-weight:600;">ACTIVE</span>';
+        const inTime = rec.clock_in ? this.parseUtcDate(rec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const outTime = rec.clock_out ? this.parseUtcDate(rec.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '<span style="color:#34d399; font-weight:600;">ACTIVE</span>';
         
         let statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399;">PRESENT</span>`;
         if (rec.status === 'OVERTIME') statusBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">OVERTIME</span>`;
