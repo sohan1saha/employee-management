@@ -233,17 +233,20 @@ if os.path.exists(web_dir):
 
 def run_web():
     """Launch the FastAPI Web Application & API."""
+    port = int(os.environ.get("PORT", 8000))
+    host = "0.0.0.0"
     print("=" * 60)
     print(f"[+] Launching {settings.PROJECT_NAME}")
-    print("[*] Web Dashboard & API URL: http://127.0.0.1:8000")
-    print("[*] Interactive Swagger Docs: http://127.0.0.1:8000/docs")
+    print(f"[*] Web Dashboard & API listening on: http://{host}:{port}")
+    print(f"[*] Interactive Swagger Docs: http://{host}:{port}/docs")
     print("=" * 60)
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
-        port=8000,
+        host=host,
+        port=port,
         reload=settings.DEBUG,
-        forwarded_allow_ips=",".join(settings.TRUSTED_PROXIES)
+        forwarded_allow_ips="*",
+        proxy_headers=True
     )
 
 
