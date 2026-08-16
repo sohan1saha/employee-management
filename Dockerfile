@@ -53,7 +53,7 @@ RUN chown -R appuser:appgroup /app && \
 
 USER appuser
 
-EXPOSE 8000
+EXPOSE 8000 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
