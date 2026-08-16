@@ -31,6 +31,11 @@ class AppController {
   showLoginOverlay() {
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('app-container').style.display = 'none';
+    const empInput = document.getElementById('login-employee-id');
+    const pwdInput = document.getElementById('login-password');
+    if (empInput) empInput.value = '';
+    if (pwdInput) pwdInput.value = '';
+    if (empInput) empInput.focus();
   }
 
   showAppLayout() {
@@ -145,14 +150,22 @@ class AppController {
     // Login form submission
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const empId = document.getElementById('login-employee-id').value.trim();
-      const p = document.getElementById('login-password').value;
+      const empInput = document.getElementById('login-employee-id');
+      const pwdInput = document.getElementById('login-password');
+      const empId = empInput.value.trim();
+      const p = pwdInput.value;
       try {
         await api.login(empId, p);
         this.showToast('Logged in successfully!', 'success');
+        empInput.value = '';
+        pwdInput.value = '';
         this.showAppLayout();
       } catch (err) {
-        this.showToast(err.message || 'Login failed', 'error');
+        this.showToast(err.message || 'Login failed. Invalid credentials.', 'error');
+        // Clear previous entries from boxes on failed attempt and refocus
+        empInput.value = '';
+        pwdInput.value = '';
+        empInput.focus();
       }
     });
 
