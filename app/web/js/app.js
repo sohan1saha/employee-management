@@ -230,15 +230,18 @@ class AppController {
     });
 
     // Global Spotlight Command Palette (Ctrl+K / Cmd+K)
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+    const handleGlobalKeydown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
         e.preventDefault();
+        e.stopPropagation();
         this.toggleCommandPalette();
       } else if (e.key === 'Escape') {
         this.closeCommandPalette();
         this.closeModals();
       }
-    });
+    };
+    window.addEventListener('keydown', handleGlobalKeydown, true);
+    document.addEventListener('keydown', handleGlobalKeydown, true);
 
     // Global unauthorized handler
     window.addEventListener('auth:unauthorized', () => {
