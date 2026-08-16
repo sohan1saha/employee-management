@@ -80,12 +80,13 @@ app.add_middleware(
 # =============================================================================
 @app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
-    # 1. Force HTTPS redirect in production
+    # 1. Force HTTPS redirect in production (exempt health probes and internal requests)
     if settings.ENVIRONMENT == "production":
-        proto = request.headers.get("x-forwarded-proto", "").lower()
-        if proto == "http" and not request.url.path.startswith("/.well-known"):
-            https_url = request.url.replace(scheme="https")
-            return RedirectResponse(url=str(https_url), status_code=status.HTTP_301_MOVED_PERMANENTLY)
+        if not request.url.path.startswith(("/healthz", "/readyz", "/.well-known")):
+            proto = request.headers.get("x-forwarded-proto", "").lower()
+            if proto == "http":
+                https_url = request.url.replace(scheme="https")
+                return RedirectResponse(url=str(https_url), status_code=status.HTTP_301_MOVED_PERMANENTLY)
 
     # 2. Request ID Generation / Propagation
     req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
