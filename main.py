@@ -5,6 +5,7 @@ import time
 import logging
 import argparse
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request, Response, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,14 +33,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("staffsync.main")
 
-# Database schema is strictly managed via Alembic migrations (e.g. `alembic upgrade head`)
-# Base.metadata.create_all() is completely omitted from application startup for zero-downtime safety.
-logger.info("Application starting: Schema is managed via Alembic migrations.")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure schema tables and initial seed data exist for zero-touch cloud deployment."""
+    logger.info("Application starting: Schema is managed via Alembic migrations.")
+    try:
+        from app.models.user import User
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+        user_count = db.query(User).count()
+        if user_count == 0:
+            logger.info("Empty database detected on startup. Initializing schema and seed records...")
+            from seed_data import seed_database
+            seed_database(reset=False)
+        db.close()
+    except Exception as e:
+        logger.warning(f"Startup database check: {e}")
+    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Enterprise HRMS, Payroll Engine, and Audit Logging Platform",
     version="2.0.0",
+    lifespan=lifespan,
     docs_url="/docs" if settings.DEBUG or settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.DEBUG or settings.ENVIRONMENT != "production" else None,
 )
