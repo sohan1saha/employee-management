@@ -8,7 +8,8 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union, Optional, Tuple
-from jose import jwt, JWTError
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
 from app.core.config import settings
 from app.services.cache_service import cache

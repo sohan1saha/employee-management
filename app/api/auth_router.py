@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -291,7 +292,7 @@ def change_password(
 
     # 5. Invalidate all existing tokens and sessions for this user
     revoke_user_sessions(str(current_user.employee_id))
-    
+
     # Invalidate caller token JTI if present
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -354,8 +355,7 @@ def logout(
     # 2. Revoke each token's JTI
     for tok in candidate_tokens:
         try:
-            from jose import jwt as jose_jwt
-            raw_payload = jose_jwt.decode(tok, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
+            raw_payload = jwt.decode(tok, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
             jti = raw_payload.get("jti")
             if jti:
                 revoke_token(jti)

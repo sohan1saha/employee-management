@@ -171,7 +171,7 @@ def test_leave_workflow_and_audit():
     assert audit_res.status_code == 200
     logs = audit_res.json()
     assert len(logs) > 0
-    actions = [l["action"] for l in logs]
+    actions = [log_item["action"] for log_item in logs]
     assert any("LEAVE" in a or "PAYROLL" in a or "EMPLOYEE" in a for a in actions)
 
 

@@ -35,7 +35,7 @@ def test_sqlite_and_schema_backup_integrity(tmp_path):
 
     # 1. Simulate SQL backup dump
     backup_file = tmp_path / "test_backup.sql.gz"
-    
+
     # In SQLite mode, export database schema & rows
     with gzip.open(backup_file, "wt", encoding="utf-8") as f:
         for line in engine.raw_connection().iterdump():

@@ -110,7 +110,7 @@ def updrec(eid, category=None, new_val=None):
             elif category == "edoj" and isinstance(new_val, str):
                 new_val = datetime.strptime(new_val, "%Y-%m-%d").date()
             setattr(emp, category, new_val)
-            
+
             audit = AuditLog(
                 user_id=1,
                 username="CLI_ADMIN",

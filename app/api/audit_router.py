@@ -46,4 +46,4 @@ def list_audit_logs(
 
     offset = (page - 1) * page_size
     logs = query.order_by(AuditLog.id.desc()).offset(offset).limit(page_size).all()
-    return [l.to_dict() for l in logs]
+    return [log.to_dict() for log in logs]

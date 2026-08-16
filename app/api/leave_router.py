@@ -100,7 +100,7 @@ def list_leave_requests(
 
     offset = (page - 1) * page_size
     leaves = query.order_by(LeaveRequest.id.desc()).offset(offset).limit(page_size).all()
-    return [l.to_dict() for l in leaves]
+    return [leave_item.to_dict() for leave_item in leaves]
 
 
 @router.patch("/{leave_id}/status")

@@ -180,9 +180,9 @@ def get_employee_dashboard_analytics(db: Session, employee_id: int) -> Dict[str,
 
     # Leaves summary
     leaves = db.query(LeaveRequest).filter(LeaveRequest.employee_id == employee_id).order_by(LeaveRequest.id.desc()).all()
-    approved_leaves = [l for l in leaves if l.status == "APPROVED"]
-    pending_leaves = [l for l in leaves if l.status == "PENDING"]
-    days_taken = sum(l.days_count for l in approved_leaves)
+    approved_leaves = [leave for leave in leaves if leave.status == "APPROVED"]
+    pending_leaves = [leave for leave in leaves if leave.status == "PENDING"]
+    days_taken = sum(leave.days_count for leave in approved_leaves)
     total_allowance = 24
     balance_days = max(0, total_allowance - days_taken)
 
@@ -225,7 +225,7 @@ def get_employee_dashboard_analytics(db: Session, employee_id: int) -> Dict[str,
             "status": emp.status,
             "joining_date": str(emp.edoj)
         },
-        "recent_leaves": [l.to_dict() for l in leaves[:5]],
+        "recent_leaves": [leave.to_dict() for leave in leaves[:5]],
         "recent_payslips": [p.to_dict() for p in payslips],
         "holidays": upcoming_holidays
     }

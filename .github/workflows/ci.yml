@@ -31,7 +31,7 @@ jobs:
 
       - name: Run Ruff Linter
         run: |
-          ruff check . --ignore E501,F401,E402
+          ruff check app/ tests/
 
   # Job 2: Secret Scanning (TruffleHog)
   secret-scan:
@@ -46,7 +46,7 @@ jobs:
       - name: Run TruffleHog Secret Scanner
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified --exclude-paths=.env.example,DEMO_CREDENTIALS.pdf
+          extra_args: --only-verified
 
   # Job 3: AST Security & Dependency Audit
   security-scan:
@@ -55,6 +55,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
@@ -73,7 +75,7 @@ jobs:
       - name: Run Pip Audit Dependency Check
         run: |
           pip install -r requirements.txt
-          pip-audit --desc on
+          pip-audit -r requirements.txt --desc on
 
   # Job 4: Integration Tests against Real PostgreSQL 16 & Redis 7
   test:
