@@ -254,7 +254,7 @@ def create_employee(
         request_id=req_id
     )
 
-    cache.invalidate_prefix("analytics:")
+    cache.invalidate_prefix("analytics")
     return employee.to_dict()
 
 
@@ -315,7 +315,7 @@ def update_employee(
             user_agent=user_agent,
             request_id=req_id
         )
-        cache.invalidate_prefix("analytics:")
+        cache.invalidate_prefix("analytics")
 
     return emp.to_dict()
 
@@ -367,7 +367,7 @@ def delete_employee(
         request_id=req_id
     )
 
-    cache.invalidate_prefix("analytics:")
+    cache.invalidate_prefix("analytics")
     return {
         "message": f"Employee #{eid} has been deactivated (status set to TERMINATED). Historical records preserved.",
         "status": "TERMINATED"

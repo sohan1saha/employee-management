@@ -74,7 +74,7 @@ def submit_leave_request(
         request_id=req_id
     )
 
-    cache.invalidate_prefix("analytics:")
+    cache.invalidate_prefix("analytics")
     return leave_req.to_dict()
 
 
@@ -158,5 +158,5 @@ def review_leave_request(
         request_id=req_id
     )
 
-    cache.invalidate_prefix("analytics:")
+    cache.invalidate_prefix("analytics")
     return leave_req.to_dict()

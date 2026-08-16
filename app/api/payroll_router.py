@@ -44,7 +44,7 @@ def trigger_payroll_generation(
         center=payload.center,
         current_user=user_dict
     )
-    cache.invalidate_prefix("analytics:")
+    cache.invalidate_prefix("analytics")
     return [r.to_dict() for r in records]
 
 
