@@ -189,15 +189,28 @@ def get_employee_dashboard_analytics(db: Session, employee_id: int) -> Dict[str,
     # Recent payslips
     payslips = db.query(PayrollRecord).filter(PayrollRecord.employee_id == employee_id).order_by(PayrollRecord.id.desc()).limit(5).all()
 
-    # Center holiday calendar
-    holidays = [
+    # Center holiday calendar (Filtered to upcoming holidays on or after current date)
+    today_str = date.today().isoformat()
+    all_holidays = [
         {"name": "Republic Day", "date": "2026-01-26", "type": "National"},
         {"name": "Labor Day", "date": "2026-05-01", "type": "Statutory"},
         {"name": "Independence Day", "date": "2026-08-15", "type": "National"},
         {"name": "Gandhi Jayanti", "date": "2026-10-02", "type": "National"},
+        {"name": "Dussehra / Vijayadashami", "date": "2026-10-20", "type": "Festival"},
         {"name": "Diwali Festival", "date": "2026-11-08", "type": "Festival"},
-        {"name": "Christmas Day", "date": "2026-12-25", "type": "Public"}
+        {"name": "Guru Nanak Jayanti", "date": "2026-11-24", "type": "Festival"},
+        {"name": "Christmas Day", "date": "2026-12-25", "type": "Public"},
+        {"name": "New Year's Day", "date": "2027-01-01", "type": "Public"},
+        {"name": "Republic Day", "date": "2027-01-26", "type": "National"},
+        {"name": "Maha Shivratri", "date": "2027-03-06", "type": "Festival"},
+        {"name": "Holi Festival", "date": "2027-03-22", "type": "Festival"},
+        {"name": "Good Friday", "date": "2027-03-26", "type": "Public"},
+        {"name": "Labor Day", "date": "2027-05-01", "type": "Statutory"},
+        {"name": "Independence Day", "date": "2027-08-15", "type": "National"},
+        {"name": "Gandhi Jayanti", "date": "2027-10-02", "type": "National"}
     ]
+    upcoming_holidays = [h for h in all_holidays if h["date"] >= today_str]
+    upcoming_holidays.sort(key=lambda x: x["date"])
 
     return {
         "is_employee_portal": True,
@@ -214,5 +227,5 @@ def get_employee_dashboard_analytics(db: Session, employee_id: int) -> Dict[str,
         },
         "recent_leaves": [l.to_dict() for l in leaves[:5]],
         "recent_payslips": [p.to_dict() for p in payslips],
-        "holidays": holidays
+        "holidays": upcoming_holidays
     }

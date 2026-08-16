@@ -318,6 +318,70 @@ body {
   color: var(--text-secondary);
 }
 
+.top-bar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Live Real-Time Clock & Date Widget */
+.live-clock-widget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  transition: var(--transition);
+}
+
+.live-clock-widget:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.live-clock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseLiveDot 2s infinite ease-in-out;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes pulseLiveDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.live-clock-day {
+  font-weight: 600;
+  color: #93c5fd;
+}
+
+.live-clock-date {
+  color: #cbd5e1;
+}
+
+.live-clock-separator {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.live-clock-time {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace, sans-serif;
+  font-weight: 700;
+  color: #34d399;
+  letter-spacing: 0.5px;
+}
+
 .top-actions {
   display: flex;
   align-items: center;

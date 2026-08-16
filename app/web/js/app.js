@@ -12,6 +12,7 @@ class AppController {
 
   init() {
     this.bindEvents();
+    this.startLiveClock();
     this.checkAuth();
   }
 
@@ -87,6 +88,32 @@ class AppController {
 
     this.switchView('dashboard');
     this.loadCentersDropdowns();
+  }
+
+  // =========================================================================
+  // Live Real-Time Clock & Date Tracker
+  // =========================================================================
+  startLiveClock() {
+    const updateClock = () => {
+      const now = new Date();
+      const dayEl = document.getElementById('live-clock-day');
+      const dateEl = document.getElementById('live-clock-date');
+      const timeEl = document.getElementById('live-clock-time');
+
+      if (!dayEl || !dateEl || !timeEl) return;
+
+      const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+      const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+      dayEl.innerText = dayName;
+      dateEl.innerText = dateStr;
+      timeEl.innerText = timeStr;
+    };
+
+    updateClock();
+    if (this.clockInterval) clearInterval(this.clockInterval);
+    this.clockInterval = setInterval(updateClock, 1000);
   }
 
   bindEvents() {
@@ -285,18 +312,34 @@ class AppController {
           `).join('');
         }
 
-        // Render Holidays List
+        // Render Holidays List (Upcoming on or after current date)
         const holidaysContainer = document.getElementById('emp-portal-holidays-list');
-        if (data.holidays && holidaysContainer) {
-          holidaysContainer.innerHTML = data.holidays.map(h => `
-            <div class="holiday-item">
-              <div>
-                <b>${h.name}</b>
-                <div style="font-size:0.75rem; color:var(--text-muted);">${h.type} Holiday</div>
+        if (holidaysContainer) {
+          const todayISO = new Date().toISOString().split('T')[0];
+          const rawHolidays = data.holidays || [];
+          const upcoming = rawHolidays
+            .filter(h => h.date >= todayISO)
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+          if (upcoming.length === 0) {
+            holidaysContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:18px; font-size:0.85rem;">No further upcoming company holidays scheduled for this period.</div>`;
+          } else {
+            holidaysContainer.innerHTML = upcoming.map(h => {
+              const d = new Date(h.date + 'T00:00:00');
+              const formattedDate = !isNaN(d.getTime())
+                ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                : h.date;
+              return `
+              <div class="holiday-item">
+                <div>
+                  <b>${h.name}</b>
+                  <div style="font-size:0.75rem; color:var(--text-muted);">${h.type} Holiday</div>
+                </div>
+                <span class="holiday-date">${formattedDate}</span>
               </div>
-              <span class="holiday-date">${h.date}</span>
-            </div>
-          `).join('');
+            `;
+            }).join('');
+          }
         }
 
         return;
