@@ -327,23 +327,42 @@ def get_attendance_summary(
 ):
     """Retrieve monthly attendance summary metrics, break status, and current check-in state."""
     target_eid = employee_id if employee_id and current_user.role in ["ADMIN", "MANAGER"] else current_user.employee_id
+    now_utc = datetime.now(timezone.utc)
 
     records = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == target_eid
     ).all()
 
     total_days = len(records)
-    total_hours = sum(float(r.total_hours) for r in records)
-    avg_hours = round(total_hours / total_days, 1) if total_days > 0 else 0.0
-    on_time_count = len([r for r in records if r.status in ["PRESENT", "OVERTIME"] or r.punctuality_status in ["ON_TIME", "EARLY"]])
-    on_time_rate = round((on_time_count / total_days) * 100.0, 1) if total_days > 0 else 0.0
 
-    today = date.today()
+    # Active unclosed session
     active_rec = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == target_eid,
         AttendanceRecord.clock_out.is_(None)
     ).order_by(AttendanceRecord.id.desc()).first()
 
+    # Sum of completed shift hours
+    closed_hours = sum(float(r.total_hours) for r in records if r.clock_out is not None)
+
+    # Calculate live running active hours for ongoing shift
+    live_active_hours = 0.0
+    active_break_sec = 0
+    if active_rec and active_rec.clock_in:
+        cin = active_rec.clock_in if active_rec.clock_in.tzinfo else active_rec.clock_in.replace(tzinfo=timezone.utc)
+        raw_sec = max(0, int((now_utc - cin).total_seconds()))
+        if active_rec.is_on_break and active_rec.break_start:
+            b_start = active_rec.break_start if active_rec.break_start.tzinfo else active_rec.break_start.replace(tzinfo=timezone.utc)
+            active_break_sec = max(0, int((now_utc - b_start).total_seconds()))
+        effective_break_sec = (active_rec.total_break_seconds or 0) + active_break_sec
+        net_sec = max(0, raw_sec - effective_break_sec)
+        live_active_hours = round(net_sec / 3600.0, 2)
+
+    total_hours = closed_hours + live_active_hours
+    avg_hours = round(total_hours / total_days, 1) if total_days > 0 else 0.0
+    on_time_count = len([r for r in records if r.status in ["PRESENT", "OVERTIME"] or r.punctuality_status in ["ON_TIME", "EARLY"]])
+    on_time_rate = round((on_time_count / total_days) * 100.0, 1) if total_days > 0 else 0.0
+
+    today = date.today()
     latest_today_rec = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == target_eid,
         AttendanceRecord.work_date == today
@@ -352,11 +371,6 @@ def get_attendance_summary(
     today_rec = active_rec if active_rec else latest_today_rec
     is_clocked_in = active_rec is not None
     is_on_break = bool(active_rec.is_on_break) if active_rec else False
-
-    active_break_sec = 0
-    if active_rec and active_rec.is_on_break and active_rec.break_start:
-        b_start = active_rec.break_start if active_rec.break_start.tzinfo else active_rec.break_start.replace(tzinfo=timezone.utc)
-        active_break_sec = max(0, int((datetime.now(timezone.utc) - b_start).total_seconds()))
 
     return {
         "total_days_present": total_days,

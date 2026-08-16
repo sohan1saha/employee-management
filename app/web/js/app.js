@@ -1553,6 +1553,8 @@ class AppController {
       
       // Update Summary KPIs
       const kpiDays = document.getElementById('att-kpi-days');
+      const kpiHours = document.getElementById('att-kpi-hours');
+      const kpiAvg = document.getElementById('att-kpi-avg');
       const kpiPunct = document.getElementById('att-kpi-punctuality');
       const kpiPunctSub = document.getElementById('att-kpi-punctuality-sub');
 
