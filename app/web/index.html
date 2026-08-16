@@ -830,9 +830,16 @@
                   Secure storage for ID proofs, signed contracts, academic certificates, and tax documents.
                 </p>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()">
-                + Upload Document
-              </button>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div id="doc-emp-selector-wrap" style="display: none;">
+                  <select id="doc-filter-employee" class="select-custom" style="min-width: 220px;" onchange="app.loadDocuments()">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()">
+                  + Upload Document
+                </button>
+              </div>
             </div>
           </div>
 

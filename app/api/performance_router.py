@@ -136,7 +136,7 @@ def acknowledge_performance_review(
             detail=f"Performance review #{review_id} not found."
         )
 
-    if current_user.role == "EMPLOYEE" and review.employee_id != current_user.employee_id:
+    if review.employee_id != current_user.employee_id and current_user.role != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only acknowledge your own performance appraisals."

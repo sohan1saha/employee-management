@@ -340,20 +340,21 @@ class AppController {
       this.availableCenters = centers;
       const empSelect = document.getElementById('emp-center-filter');
       const paySelect = document.getElementById('payroll-center-filter');
+      const attSelect = document.getElementById('att-center-filter');
 
-      if (api.user?.role === 'MANAGER' && centers.length === 1) {
+      if (api.user?.role === 'EMPLOYEE') {
+        if (attSelect) attSelect.style.display = 'none';
+      } else if (api.user?.role === 'MANAGER' && centers.length === 1) {
         const optionsHtml = `<option value="${centers[0]}">${centers[0]} Center</option>`;
-        empSelect.innerHTML = optionsHtml;
-        paySelect.innerHTML = optionsHtml;
-        empSelect.disabled = true;
-        paySelect.disabled = true;
+        if (empSelect) { empSelect.innerHTML = optionsHtml; empSelect.disabled = true; }
+        if (paySelect) { paySelect.innerHTML = optionsHtml; paySelect.disabled = true; }
+        if (attSelect) { attSelect.innerHTML = optionsHtml; attSelect.disabled = true; attSelect.style.display = 'inline-block'; }
       } else {
         const optionsHtml = '<option value="ALL">All Centers</option>' +
           centers.map(c => `<option value="${c}">${c}</option>`).join('');
-        empSelect.innerHTML = optionsHtml;
-        paySelect.innerHTML = optionsHtml;
-        empSelect.disabled = false;
-        paySelect.disabled = false;
+        if (empSelect) { empSelect.innerHTML = optionsHtml; empSelect.disabled = false; }
+        if (paySelect) { paySelect.innerHTML = optionsHtml; paySelect.disabled = false; }
+        if (attSelect) { attSelect.innerHTML = optionsHtml; attSelect.disabled = false; attSelect.style.display = 'inline-block'; }
       }
     } catch (err) {
       console.error('Failed to load centers:', err);
@@ -458,7 +459,7 @@ class AppController {
 
       // Render All 6 Interactive Visualizations
       if (typeof Chart === 'undefined') {
-        setTimeout(() => this.loadDashboardAnalytics(), 200);
+        setTimeout(() => this.loadDashboard(), 200);
         return;
       }
 
@@ -1130,7 +1131,7 @@ class AppController {
       this.showToast(`Employee #${eid} has been deactivated.`, 'info');
       await this.loadEmployees();
       await this.loadCentersDropdowns();
-      await this.loadDashboardAnalytics();
+      await this.loadDashboard();
     } catch (err) {
       this.showToast(err.message || 'Deactivation failed', 'error');
     }
@@ -1815,7 +1816,7 @@ class AppController {
         if (rev.goals_met === 'EXCEEDED') goalBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">🌟 EXCEEDED</span>`;
         else if (rev.goals_met === 'NEEDS_IMPROVEMENT') goalBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171;">NEEDS IMPROVEMENT</span>`;
 
-        const isOwnReview = api.user?.role === 'EMPLOYEE' && rev.employee_id === api.user?.employee_id;
+        const isOwnReview = rev.employee_id === api.user?.employee_id;
         const ackSection = rev.is_acknowledged
           ? `<div style="margin-top:14px; padding:10px 14px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2); border-radius:6px; font-size:0.8rem; color:#34d399;">
                ✓ <b>Acknowledged by Employee</b> on ${new Date(rev.acknowledged_at).toLocaleDateString()}
@@ -1934,10 +1935,29 @@ class AppController {
   // =========================================================================
   async loadDocuments() {
     try {
-      const eid = api.user?.employee_id;
-      if (!eid) return;
+      const isManagerOrAdmin = api.user?.role !== 'EMPLOYEE';
+      const selectorWrap = document.getElementById('doc-emp-selector-wrap');
+      const filterSelect = document.getElementById('doc-filter-employee');
 
-      const docs = await api.getEmployeeDocuments(eid);
+      if (isManagerOrAdmin && selectorWrap && filterSelect) {
+        selectorWrap.style.display = 'block';
+        if (filterSelect.options.length <= 1) {
+          const emps = await api.getEmployees({ status: 'ACTIVE' });
+          const myEid = api.user?.employee_id;
+          filterSelect.innerHTML = `<option value="${myEid}">My Personal Documents (#${myEid})</option>` +
+            emps
+              .filter(e => e.eid !== myEid)
+              .map(e => `<option value="${e.eid}">${e.ename} (#${e.eid} • ${e.ecen})</option>`)
+              .join('');
+        }
+      } else if (selectorWrap) {
+        selectorWrap.style.display = 'none';
+      }
+
+      const selectedEid = (isManagerOrAdmin && filterSelect?.value) ? parseInt(filterSelect.value) : api.user?.employee_id;
+      if (!selectedEid) return;
+
+      const docs = await api.getEmployeeDocuments(selectedEid);
       const grid = document.getElementById('documents-grid');
       if (!grid) return;
 
@@ -1945,7 +1965,7 @@ class AppController {
         grid.innerHTML = `
           <div class="card" style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
             <h3>Document Vault is Empty</h3>
-            <p style="font-size:0.85rem; margin-top:6px;">Upload your ID proof, degree certificates, and signed contracts for permanent compliance storage.</p>
+            <p style="font-size:0.85rem; margin-top:6px;">Upload ID proof, degree certificates, and signed contracts for permanent compliance storage.</p>
             <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()" style="margin-top:14px;">+ Upload First File</button>
           </div>
         `;

@@ -15,6 +15,7 @@ class ApiClient {
     this.user = JSON.parse(localStorage.getItem('user_info') || 'null');
     this.isRefreshing = false;
     this.refreshSubscribers = [];
+    this.baseUrl = API_BASE;
   }
 
   setSession(accessToken, refreshToken, user) {
@@ -325,13 +326,14 @@ class ApiClient {
   // --- Document Vault Endpoints ---
   async uploadDocument(formData) {
     // Custom multipart request (bypasses JSON stringify)
-    const token = this.getAccessToken();
+    const token = this.token || localStorage.getItem('access_token');
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${this.baseUrl}/documents/upload`, {
+    const res = await fetch(`${API_BASE}/documents/upload`, {
       method: 'POST',
       headers,
+      credentials: 'include',
       body: formData
     });
 
@@ -351,7 +353,11 @@ class ApiClient {
   }
 
   getDocumentDownloadUrl(docId) {
-    return `${this.baseUrl}/documents/${docId}/download`;
+    return `${API_BASE}/documents/${docId}/download`;
+  }
+
+  getAccessToken() {
+    return this.token || localStorage.getItem('access_token');
   }
 
   // --- Notification Endpoints ---
