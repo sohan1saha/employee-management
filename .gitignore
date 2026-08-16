@@ -1,24 +1,60 @@
 # Environment & Secrets
 .env
 *.env.local
+.env.*
+!.env.example
 
 # Python Cache & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Test & Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
 
-# Database & Logs
-staffsync.db
+# Database, Uploads & Storage
+*.db
+*.sqlite
 *.sqlite3
+staffsync.db
+apex_hrms.db
+uploads/
+backups/
 *.log
 
-# IDE & Editor
+# Operating System & IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
