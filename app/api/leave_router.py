@@ -11,7 +11,7 @@ from app.schemas.leave_schema import LeaveCreate, LeaveStatusUpdate, LeaveRespon
 from app.api.deps import get_current_user, require_roles, get_user_scope_center, get_request_id
 from app.services.audit_service import record_audit
 from app.services.cache_service import cache
-from app.services.email_service import notify_leave_status
+from app.services.email_service import notify_leave_status, notify_admin_manager_leave_request
 
 router = APIRouter(prefix="/leaves", tags=["Leaves & Attendance"])
 
@@ -23,7 +23,7 @@ def submit_leave_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Submit a new leave request with IDOR verification."""
+    """Submit a new leave request with IDOR verification and manager-to-admin escalation."""
     req_id = get_request_id(request)
     client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("User-Agent", "Unknown")
@@ -34,6 +34,16 @@ def submit_leave_request(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You can only apply for leave on your own account."
         )
+
+    # Manager applying on behalf: verify center scoping if not applying for self
+    if current_user.role == "MANAGER" and current_user.employee_id != leave_in.employee_id:
+        scoped_center = get_user_scope_center(db, current_user)
+        target_emp = db.query(Employee).filter(Employee.eid == leave_in.employee_id).first()
+        if scoped_center and target_emp and target_emp.ecen != scoped_center:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. You can only apply on behalf of employees in the '{scoped_center}' center."
+            )
 
     emp = db.query(Employee).filter(Employee.eid == leave_in.employee_id).first()
     if not emp or emp.status == "TERMINATED":
@@ -61,6 +71,18 @@ def submit_leave_request(
     db.add(leave_req)
     db.commit()
     db.refresh(leave_req)
+
+    # If a Manager applies for personal leave, escalate notification to Admins
+    if current_user.role == "MANAGER" and current_user.employee_id == leave_in.employee_id:
+        notify_admin_manager_leave_request(
+            db=db,
+            manager_name=emp.ename if emp else f"Manager #{current_user.employee_id}",
+            center=emp.ecen if emp else "Regional Center",
+            leave_type=leave_in.leave_type,
+            days_count=days,
+            start_date=str(leave_in.start_date),
+            end_date=str(leave_in.end_date)
+        )
 
     record_audit(
         db=db,
@@ -112,7 +134,7 @@ def review_leave_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["ADMIN", "MANAGER"]))
 ):
-    """Approve or reject a leave request (Admin / Manager only)."""
+    """Approve or reject a leave request. Manager leave requests strictly require Admin approval."""
     req_id = get_request_id(request)
     client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("User-Agent", "Unknown")
@@ -122,6 +144,22 @@ def review_leave_request(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Leave request #{leave_id} not found."
+        )
+
+    # Self-approval prohibition
+    if leave_req.employee_id == current_user.employee_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot approve or reject your own leave request. Manager leave requests require approval from an Administrator."
+        )
+
+    # Manager applicant approval check: only Admin can approve/reject a Manager's leave request
+    target_user = db.query(User).filter(User.employee_id == leave_req.employee_id).first()
+    is_target_manager = target_user is not None and target_user.role == "MANAGER"
+    if is_target_manager and current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Regional Manager leave requests require authorization and approval from a System Administrator."
         )
 
     scoped_center = get_user_scope_center(db, current_user)

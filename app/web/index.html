@@ -223,6 +223,39 @@
               </div>
             </div>
 
+            <!-- Manager / Admin Personal Attendance & Shift Tracker -->
+            <div class="card attendance-widget-card" id="manager-attendance-card" style="margin-top: 24px; background: linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.95)); border: 1px solid rgba(255,255,255,0.08);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <div style="font-size: 2rem;">⏱️</div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0;">My Shift & Work Hours Today</h3>
+                      <span class="badge attendance-status-badge badge-warning" id="admin-attendance-status-badge">NOT CLOCKED IN</span>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" class="attendance-details-text" id="admin-attendance-details">
+                      Punch in when beginning operations to log active duty hours.
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 20px;">
+                  <div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
+                    <div class="attendance-stopwatch" id="admin-attendance-timer" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 105px;">
+                      ▶ Clock In
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 105px;" disabled>
+                      ⏹ Clock Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Visual Analytics Grid: Row 1 -->
             <div class="charts-grid" style="margin-top: 24px;">
               <div class="card">
@@ -572,9 +605,14 @@
                   <option value="REJECTED">Rejected</option>
                 </select>
               </div>
-              <button class="btn btn-primary" onclick="app.openApplyLeaveModal()">
-                Request Time Off
-              </button>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" id="btn-apply-my-leave" onclick="app.openApplyLeaveModal(true)" style="display: none;">
+                  + Request My Leave
+                </button>
+                <button class="btn btn-primary" id="btn-apply-staff-leave" onclick="app.openApplyLeaveModal(false)">
+                  + Request Time Off
+                </button>
+              </div>
             </div>
 
             <div class="table-responsive">
@@ -635,6 +673,39 @@
 
         <!-- ==================== VIEW 6: ATTENDANCE HUB ==================== -->
         <section id="view-attendance" class="app-view" style="display: none;">
+          <!-- Personal Shift & Attendance Punch Tracker -->
+          <div class="card attendance-widget-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.95)); border: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="font-size: 2rem;">⏱️</div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0;">Today's Attendance & Time Tracker</h3>
+                    <span class="badge attendance-status-badge badge-warning">NOT CLOCKED IN</span>
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" class="attendance-details-text">
+                    Punch in when beginning operations to log active duty hours.
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 20px;">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
+                  <div class="attendance-stopwatch" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 105px;">
+                    ▶ Clock In
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 105px;" disabled>
+                    ⏹ Clock Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Attendance Summary Metrics -->
           <div class="kpi-grid" style="margin-bottom: 24px;">
             <div class="kpi-card">

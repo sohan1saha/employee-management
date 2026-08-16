@@ -130,6 +130,33 @@ def notify_performance_review(
     )
 
 
+def notify_admin_manager_leave_request(
+    db: Session,
+    manager_name: str,
+    center: str,
+    leave_type: str,
+    days_count: int,
+    start_date: str,
+    end_date: str
+):
+    """Notify all administrators when a regional manager submits a personal leave request."""
+    admins = db.query(User).filter(User.role == "ADMIN", User.is_active.is_(True)).all()
+    title = f"Manager Leave Request: {manager_name} ({center})"
+    message = (
+        f"Regional Manager {manager_name} ({center}) has applied for {days_count} day(s) of {leave_type} "
+        f"from {start_date} to {end_date}. Administrator review and authorization required."
+    )
+    for admin in admins:
+        create_in_app_notification(
+            db=db,
+            user_id=admin.id,
+            title=title,
+            message=message,
+            category="LEAVE",
+            action_url="#leaves"
+        )
+
+
 def send_email_async(
     to_email: str,
     subject: str,

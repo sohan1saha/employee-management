@@ -446,6 +446,9 @@ class AppController {
 
       // Render Regional Matrix Table
       this.renderCenterMatrixTable(data.center_distribution, kpis.monthly_payroll_burn);
+
+      // Always sync personal attendance tracker for Admin/Manager
+      await this.loadAttendanceData();
     } catch (err) {
       console.error('Failed to load analytics:', err);
       this.showToast('Failed to load analytics', 'error');
@@ -1187,6 +1190,30 @@ class AppController {
   // =========================================================================
   async loadLeaves() {
     const status_filter = document.getElementById('leave-status-filter').value;
+    
+    // Dynamically configure action buttons for role
+    const btnMyLeave = document.getElementById('btn-apply-my-leave');
+    const btnStaffLeave = document.getElementById('btn-apply-staff-leave');
+    if (api.user?.role === 'MANAGER') {
+      if (btnMyLeave) btnMyLeave.style.display = 'inline-flex';
+      if (btnStaffLeave) {
+        btnStaffLeave.style.display = 'inline-flex';
+        btnStaffLeave.innerText = '+ Request for Staff';
+      }
+    } else if (api.user?.role === 'EMPLOYEE') {
+      if (btnMyLeave) btnMyLeave.style.display = 'none';
+      if (btnStaffLeave) {
+        btnStaffLeave.style.display = 'inline-flex';
+        btnStaffLeave.innerText = '+ Request Time Off';
+      }
+    } else {
+      if (btnMyLeave) btnMyLeave.style.display = 'none';
+      if (btnStaffLeave) {
+        btnStaffLeave.style.display = 'inline-flex';
+        btnStaffLeave.innerText = '+ Apply Leave on Behalf';
+      }
+    }
+
     try {
       const leaves = await api.getLeaves({ status_filter });
       const tbody = document.getElementById('leaves-table-body');
@@ -1196,40 +1223,74 @@ class AppController {
         return;
       }
 
-      tbody.innerHTML = leaves.map(l => `
-        <tr>
-          <td>#${l.id}</td>
-          <td><b>${l.employee_name}</b> (Emp #${l.employee_id})</td>
-          <td><span class="badge badge-primary">${l.leave_type}</span></td>
-          <td>${l.start_date} to ${l.end_date}</td>
-          <td><b>${l.days_count} days</b></td>
-          <td>${l.reason}</td>
-          <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
-          <td>
-            ${l.status === 'PENDING' && api.user?.role !== 'EMPLOYEE' ? `
+      tbody.innerHTML = leaves.map(l => {
+        const isSelf = l.employee_id === api.user?.employee_id;
+        const isManagerApplicant = l.position && l.position.toLowerCase().includes('manager');
+        let actionCell = '—';
+
+        if (l.status === 'PENDING') {
+          if (isSelf) {
+            actionCell = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; font-size:0.75rem;">⏳ Awaiting Admin Approval</span>`;
+          } else if (api.user?.role === 'ADMIN') {
+            actionCell = `
               <div class="action-btns">
                 <button class="btn btn-primary btn-sm" onclick="app.reviewLeave(${l.id}, 'APPROVED')">Approve</button>
                 <button class="btn btn-danger btn-sm" onclick="app.reviewLeave(${l.id}, 'REJECTED')">Reject</button>
               </div>
-            ` : (l.review_comment ? `<small style="color:var(--text-muted);">${l.review_comment}</small>` : '—')}
-          </td>
-        </tr>
-      `).join('');
+            `;
+          } else if (api.user?.role === 'MANAGER') {
+            if (isManagerApplicant) {
+              actionCell = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; font-size:0.75rem;">⏳ Awaiting Admin Approval</span>`;
+            } else {
+              actionCell = `
+                <div class="action-btns">
+                  <button class="btn btn-primary btn-sm" onclick="app.reviewLeave(${l.id}, 'APPROVED')">Approve</button>
+                  <button class="btn btn-danger btn-sm" onclick="app.reviewLeave(${l.id}, 'REJECTED')">Reject</button>
+                </div>
+              `;
+            }
+          } else {
+            actionCell = `<span class="badge badge-pending">PENDING</span>`;
+          }
+        } else {
+          actionCell = l.review_comment ? `<small style="color:var(--text-muted);">${l.review_comment}</small>` : (l.reviewed_by ? `<small style="color:var(--text-muted);">Reviewed by ${l.reviewed_by}</small>` : '—');
+        }
+
+        return `
+          <tr>
+            <td>#${l.id}</td>
+            <td><b>${l.employee_name}</b> <small style="color:var(--text-muted);">(#${l.employee_id})</small><br><small style="color:var(--text-muted);">${l.position || 'Staff'} • ${l.center || ''}</small></td>
+            <td><span class="badge badge-primary">${l.leave_type}</span></td>
+            <td>${l.start_date} to ${l.end_date}</td>
+            <td><b>${l.days_count} days</b></td>
+            <td>${l.reason}</td>
+            <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
+            <td>${actionCell}</td>
+          </tr>
+        `;
+      }).join('');
     } catch (err) {
       this.showToast('Failed to load leaves', 'error');
     }
   }
 
-  openApplyLeaveModal() {
+  openApplyLeaveModal(forSelf = false) {
     document.getElementById('form-apply-leave').reset();
-    if (api.user?.role === 'EMPLOYEE' && api.user?.employee_id) {
-      document.getElementById('leave-emp-id').value = api.user.employee_id;
-      document.getElementById('leave-emp-id').readOnly = true;
-    } else {
-      document.getElementById('leave-emp-id').readOnly = false;
+    const empIdInput = document.getElementById('leave-emp-id');
+    if (empIdInput) {
+      if (forSelf || (api.user?.role === 'EMPLOYEE' && api.user?.employee_id)) {
+        empIdInput.value = api.user?.employee_id || '';
+        empIdInput.readOnly = true;
+      } else {
+        empIdInput.value = '';
+        empIdInput.readOnly = false;
+      }
     }
-    document.getElementById('modal-apply-leave').style.display = 'flex';
-    document.getElementById('modal-apply-leave').classList.add('active');
+    const modal = document.getElementById('modal-apply-leave');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
   }
 
   async handleApplyLeave(e) {
@@ -1491,25 +1552,25 @@ class AppController {
   }
 
   updateAttendanceWidgetState(summary) {
-    const badge = document.getElementById('emp-attendance-status-badge');
-    const timer = document.getElementById('emp-attendance-timer');
-    const details = document.getElementById('emp-attendance-details');
-    const btnIn = document.getElementById('btn-emp-clock-in');
-    const btnOut = document.getElementById('btn-emp-clock-out');
-
-    if (!badge || !timer) return;
+    const badges = document.querySelectorAll('.attendance-status-badge, #emp-attendance-status-badge, #admin-attendance-status-badge');
+    const timers = document.querySelectorAll('.attendance-stopwatch, #emp-attendance-timer, #admin-attendance-timer');
+    const detailsEls = document.querySelectorAll('.attendance-details-text, #emp-attendance-details, #admin-attendance-details');
+    const btnsIn = document.querySelectorAll('.btn-clock-in, #btn-emp-clock-in');
+    const btnsOut = document.querySelectorAll('.btn-clock-out, #btn-emp-clock-out');
 
     if (summary.is_currently_clocked_in && summary.today_record) {
-      badge.innerText = 'ONLINE / ON DUTY';
-      badge.style.background = 'rgba(16, 185, 129, 0.2)';
-      badge.style.color = '#34d399';
-      if (btnIn) btnIn.disabled = true;
-      if (btnOut) btnOut.disabled = false;
+      badges.forEach(b => {
+        b.innerText = 'ONLINE / ON DUTY';
+        b.style.background = 'rgba(16, 185, 129, 0.2)';
+        b.style.color = '#34d399';
+      });
+      btnsIn.forEach(b => b.disabled = true);
+      btnsOut.forEach(b => b.disabled = false);
 
       const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
-      if (details) {
-        details.innerText = `Clocked in at ${clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-      }
+      detailsEls.forEach(d => {
+        d.innerText = `Clocked in at ${clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      });
       this.startAttendanceStopwatch(summary.today_record.clock_in);
     } else if (summary.today_record && summary.today_record.clock_out) {
       if (this.attendanceStopwatchInterval) {
@@ -1517,17 +1578,19 @@ class AppController {
         this.attendanceStopwatchInterval = null;
       }
 
-      badge.innerText = 'SHIFT COMPLETED';
-      badge.style.background = 'rgba(59, 130, 246, 0.2)';
-      badge.style.color = '#60a5fa';
-      if (btnIn) btnIn.disabled = false;
-      if (btnOut) btnOut.disabled = true;
+      badges.forEach(b => {
+        b.innerText = 'SHIFT COMPLETED';
+        b.style.background = 'rgba(59, 130, 246, 0.2)';
+        b.style.color = '#60a5fa';
+      });
+      btnsIn.forEach(b => b.disabled = false);
+      btnsOut.forEach(b => b.disabled = true);
 
       const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
       const clockOutTime = this.parseUtcDate(summary.today_record.clock_out);
-      if (details) {
-        details.innerText = `Shift ended at ${clockOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${summary.today_record.total_hours} hrs logged)`;
-      }
+      detailsEls.forEach(d => {
+        d.innerText = `Shift ended at ${clockOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${summary.today_record.total_hours} hrs logged)`;
+      });
 
       let totalSec = summary.today_record.elapsed_seconds;
       if (totalSec === undefined || totalSec === null) {
@@ -1536,19 +1599,22 @@ class AppController {
       const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
       const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
       const secs = String(totalSec % 60).padStart(2, '0');
-      timer.innerText = `${hrs}:${mins}:${secs}`;
+      const timeStr = `${hrs}:${mins}:${secs}`;
+      timers.forEach(t => t.innerText = timeStr);
     } else {
       if (this.attendanceStopwatchInterval) {
         clearInterval(this.attendanceStopwatchInterval);
         this.attendanceStopwatchInterval = null;
       }
-      badge.innerText = 'NOT CLOCKED IN';
-      badge.style.background = 'rgba(100, 116, 139, 0.2)';
-      badge.style.color = '#94a3b8';
-      if (btnIn) btnIn.disabled = false;
-      if (btnOut) btnOut.disabled = true;
-      if (details) details.innerText = 'Shift not started';
-      timer.innerText = '00:00:00';
+      badges.forEach(b => {
+        b.innerText = 'NOT CLOCKED IN';
+        b.style.background = 'rgba(100, 116, 139, 0.2)';
+        b.style.color = '#94a3b8';
+      });
+      btnsIn.forEach(b => b.disabled = false);
+      btnsOut.forEach(b => b.disabled = true);
+      detailsEls.forEach(d => d.innerText = 'Shift not started');
+      timers.forEach(t => t.innerText = '00:00:00');
     }
   }
 
@@ -1566,9 +1632,11 @@ class AppController {
       const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
       const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
       const secs = String(totalSec % 60).padStart(2, '0');
+      const timeStr = `${hrs}:${mins}:${secs}`;
 
-      const timer = document.getElementById('emp-attendance-timer');
-      if (timer) timer.innerText = `${hrs}:${mins}:${secs}`;
+      document.querySelectorAll('.attendance-stopwatch, #emp-attendance-timer, #admin-attendance-timer').forEach(el => {
+        el.innerText = timeStr;
+      });
     };
 
     updateTimer();

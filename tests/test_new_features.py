@@ -258,3 +258,61 @@ def test_notifications_feed_and_state(client, test_db):
     # 4. Mark all as read
     res_all = client.post("/api/notifications/mark-all-read", headers=staff_headers)
     assert res_all.status_code == 200
+
+
+# =============================================================================
+# Test Suite 5: Manager Attendance & Personal Leave Permissions from Admin
+# =============================================================================
+def test_manager_attendance_and_leave_workflow(client, test_db):
+    mgr_headers = get_auth_header(1023101, "MANAGER")
+    admin_headers = get_auth_header(9924101, "ADMIN")
+
+    # 1. Manager Clock-In and Clock-Out
+    res_in = client.post("/api/attendance/clock-in", json={"notes": "Manager On-Duty Shift"}, headers=mgr_headers)
+    assert res_in.status_code == 200
+    assert res_in.json()["employee_id"] == 1023101
+
+    res_sum = client.get("/api/attendance/summary", headers=mgr_headers)
+    assert res_sum.status_code == 200
+    assert res_sum.json()["is_currently_clocked_in"] is True
+
+    res_out = client.post("/api/attendance/clock-out", json={"notes": "Shift Finished"}, headers=mgr_headers)
+    assert res_out.status_code == 200
+    assert res_out.json()["clock_out"] is not None
+
+    # 2. Manager applies for personal leave
+    leave_payload = {
+        "employee_id": 1023101,
+        "leave_type": "PTO",
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-05",
+        "reason": "Executive Annual Leave"
+    }
+    res_leave = client.post("/api/leaves", json=leave_payload, headers=mgr_headers)
+    assert res_leave.status_code == 201
+    leave_id = res_leave.json()["id"]
+
+    # 3. Verify Admin received in-app notification of Manager's leave request
+    res_admin_notif = client.get("/api/notifications", headers=admin_headers)
+    assert res_admin_notif.status_code == 200
+    admin_notifs = res_admin_notif.json()["notifications"]
+    assert any("Manager Leave Request: Sara Chen" in n["title"] for n in admin_notifs)
+
+    # 4. Manager CANNOT approve their own leave request (Forbidden 403)
+    res_self_approve = client.patch(
+        f"/api/leaves/{leave_id}/status",
+        json={"status": "APPROVED", "review_comment": "Self-approved"},
+        headers=mgr_headers
+    )
+    assert res_self_approve.status_code == 403
+    assert "cannot approve or reject your own leave" in res_self_approve.json()["detail"]
+
+    # 5. Admin approves Manager's leave request (Success 200)
+    res_admin_approve = client.patch(
+        f"/api/leaves/{leave_id}/status",
+        json={"status": "APPROVED", "review_comment": "Approved by HQ Admin"},
+        headers=admin_headers
+    )
+    assert res_admin_approve.status_code == 200
+    assert res_admin_approve.json()["status"] == "APPROVED"
+

@@ -33,6 +33,7 @@ class LeaveRequest(Base):
             "id": self.id,
             "employee_id": self.employee_id,
             "employee_name": self.employee.ename if self.employee else "Unknown",
+            "position": self.employee.epos if self.employee else "Staff",
             "center": self.employee.ecen if self.employee else "N/A",
             "leave_type": self.leave_type,
             "start_date": self.start_date.strftime("%Y-%m-%d") if self.start_date else None,
