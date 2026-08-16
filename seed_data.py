@@ -9,6 +9,10 @@ from app.models.employee import Employee
 from app.models.leave import LeaveRequest
 from app.models.payroll import PayrollRecord
 from app.models.audit import AuditLog
+from app.models.attendance import AttendanceRecord
+from app.models.performance import PerformanceReview
+from app.models.document import EmployeeDocument
+from app.models.notification import Notification
 from app.core.security import get_password_hash
 from app.services.payroll_service import calculate_salary_breakdown
 
@@ -302,6 +306,170 @@ def seed_database(reset: bool = True):
             )
         ]
         db.add_all(sample_audits)
+        db.commit()
+
+        # Retrieve user instances for foreign keys
+        admin_user = db.query(User).filter(User.employee_id == 9924101).first()
+        mgr_user = db.query(User).filter(User.employee_id == 1023101).first()
+        emp_user = db.query(User).filter(User.employee_id == 1025102).first()
+
+        # 6. Create Sample Attendance Records for Employees
+        today = date.today()
+        sample_attendance = []
+        for days_back in range(1, 6):
+            work_dt = today - timedelta(days=days_back)
+            if work_dt.weekday() < 5:  # Monday to Friday
+                sample_attendance.extend([
+                    AttendanceRecord(
+                        employee_id=1025102,  # Jordan Rivera
+                        work_date=work_dt,
+                        clock_in=datetime(work_dt.year, work_dt.month, work_dt.day, 9, 15, tzinfo=timezone.utc),
+                        clock_out=datetime(work_dt.year, work_dt.month, work_dt.day, 18, 0, tzinfo=timezone.utc),
+                        total_hours=Decimal('8.75'),
+                        status="PRESENT",
+                        ip_address="192.168.10.45"
+                    ),
+                    AttendanceRecord(
+                        employee_id=1023101,  # Sara Chen (Manager)
+                        work_date=work_dt,
+                        clock_in=datetime(work_dt.year, work_dt.month, work_dt.day, 8, 55, tzinfo=timezone.utc),
+                        clock_out=datetime(work_dt.year, work_dt.month, work_dt.day, 18, 30, tzinfo=timezone.utc),
+                        total_hours=Decimal('9.58'),
+                        status="OVERTIME",
+                        ip_address="192.168.10.12"
+                    ),
+                    AttendanceRecord(
+                        employee_id=4025101,  # Siddharth Sen
+                        work_date=work_dt,
+                        clock_in=datetime(work_dt.year, work_dt.month, work_dt.day, 9, 30, tzinfo=timezone.utc),
+                        clock_out=datetime(work_dt.year, work_dt.month, work_dt.day, 18, 0, tzinfo=timezone.utc),
+                        total_hours=Decimal('8.50'),
+                        status="PRESENT",
+                        ip_address="192.168.40.18"
+                    )
+                ])
+
+        # Today's active check-in for Jordan Rivera
+        sample_attendance.append(
+            AttendanceRecord(
+                employee_id=1025102,
+                work_date=today,
+                clock_in=datetime(today.year, today.month, today.day, 9, 0, tzinfo=timezone.utc),
+                clock_out=None,
+                total_hours=Decimal('0.00'),
+                status="PRESENT",
+                ip_address="192.168.10.45",
+                notes="Morning check-in from workstation"
+            )
+        )
+        db.add_all(sample_attendance)
+        db.commit()
+
+        # 7. Create Sample Performance Appraisal Reviews
+        sample_reviews = [
+            PerformanceReview(
+                employee_id=1025102,  # Jordan Rivera
+                reviewer_id=mgr_user.id,
+                review_period="Q1 2026",
+                rating=4.8,
+                goals_met="EXCEEDED",
+                strengths="Exceptional problem-solving skills, proactive communication, and high-quality frontend implementation.",
+                areas_for_improvement="Continue mentoring junior engineers on state management and automated test patterns.",
+                manager_feedback="Jordan has been a cornerstone for our Bangalore product releases this quarter. Outstanding dedication!",
+                employee_comments="Thank you Sara! Looking forward to leading the mobile optimization initiative in Q2.",
+                is_acknowledged=True,
+                acknowledged_at=datetime.now(timezone.utc) - timedelta(days=5),
+                status="FINALIZED"
+            ),
+            PerformanceReview(
+                employee_id=4025101,  # Siddharth Sen
+                reviewer_id=admin_user.id,
+                review_period="Q1 2026",
+                rating=4.5,
+                goals_met="MET",
+                strengths="Strong leadership of Kolkata branch operations, flawless client delivery, and high team morale.",
+                areas_for_improvement="Expand cross-center knowledge sharing sessions with Bangalore team.",
+                manager_feedback="Siddharth managed the regional rollout seamlessly. Great progress on KPI targets.",
+                employee_comments=None,
+                is_acknowledged=False,
+                status="FINALIZED"
+            )
+        ]
+        db.add_all(sample_reviews)
+        db.commit()
+
+        # 8. Create Sample Document Metadata
+        sample_docs = [
+            EmployeeDocument(
+                employee_id=1025102,
+                title="National Identity Card (Aadhaar/Passport)",
+                document_type="ID_PROOF",
+                file_name="jordan_rivera_id_proof.pdf",
+                file_size=245760,
+                mime_type="application/pdf",
+                file_path="storage/documents/1025102/id_proof.pdf",
+                uploaded_by=emp_user.id
+            ),
+            EmployeeDocument(
+                employee_id=1025102,
+                title="Employment Contract & NDA Agreement",
+                document_type="CONTRACT",
+                file_name="employment_agreement_signed.pdf",
+                file_size=512000,
+                mime_type="application/pdf",
+                file_path="storage/documents/1025102/contract.pdf",
+                uploaded_by=admin_user.id
+            ),
+            EmployeeDocument(
+                employee_id=1025102,
+                title="B.Tech Computer Science Degree Certificate",
+                document_type="CERTIFICATE",
+                file_name="degree_certificate.pdf",
+                file_size=389120,
+                mime_type="application/pdf",
+                file_path="storage/documents/1025102/degree.pdf",
+                uploaded_by=emp_user.id
+            )
+        ]
+        db.add_all(sample_docs)
+        db.commit()
+
+        # 9. Create Sample In-App Notifications
+        sample_notifications = [
+            Notification(
+                user_id=emp_user.id,
+                title="Welcome to StaffSync 360",
+                message="Welcome to your new enterprise employee workspace! Explore your attendance tracker, payslips, and PTO requests.",
+                category="SYSTEM",
+                action_url="#overview",
+                is_read=True
+            ),
+            Notification(
+                user_id=emp_user.id,
+                title="Performance Appraisal Published: Q1 2026",
+                message="Sara Chen has submitted your Q1 2026 performance appraisal with a rating of 4.8/5.0. Review your feedback now.",
+                category="APPRAISAL",
+                action_url="#performance",
+                is_read=False
+            ),
+            Notification(
+                user_id=emp_user.id,
+                title=f"Payslip Available: {current_month}",
+                message=f"Your payroll record for {current_month} has been calculated. Net pay: ₹98,820.00.",
+                category="PAYROLL",
+                action_url="#payslips",
+                is_read=False
+            ),
+            Notification(
+                user_id=mgr_user.id,
+                title="Pending Leave Request for Review",
+                message="Jordan Rivera has requested 3 days of Casual Leave. Please review and take action.",
+                category="LEAVE",
+                action_url="#leaves",
+                is_read=False
+            )
+        ]
+        db.add_all(sample_notifications)
         db.commit()
 
         print("[SUCCESS] Database successfully re-seeded with Employee ID logins!")

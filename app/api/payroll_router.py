@@ -13,6 +13,7 @@ from app.api.deps import get_current_user, require_roles, get_user_scope_center,
 from app.services.payroll_service import generate_payroll_for_month, generate_payslip_pdf
 from app.services.audit_service import record_audit
 from app.services.cache_service import cache
+from app.services.email_service import notify_payroll_generated
 
 router = APIRouter(prefix="/payroll", tags=["Payroll & Compensation"])
 
@@ -45,6 +46,16 @@ def trigger_payroll_generation(
         current_user=user_dict
     )
     cache.invalidate_prefix("analytics")
+
+    # Dispatch in-app notification & payslip alert for each employee
+    for r in records:
+        notify_payroll_generated(
+            db=db,
+            employee_id=r.employee_id,
+            pay_period=r.month_year,
+            net_salary=float(r.net_salary)
+        )
+
     return [r.to_dict() for r in records]
 
 

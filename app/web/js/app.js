@@ -13,6 +13,7 @@ class AppController {
   init() {
     this.bindEvents();
     this.startLiveClock();
+    this.startNotificationPolling();
     this.checkAuth();
   }
 
@@ -49,33 +50,53 @@ class AppController {
     const navDashboard = document.getElementById('nav-dashboard');
     const navPayroll = document.getElementById('nav-payroll');
     const navLeaves = document.getElementById('nav-leaves');
+    const navAttendance = document.getElementById('nav-attendance');
+    const navPerformance = document.getElementById('nav-performance');
+    const navDocuments = document.getElementById('nav-documents');
     const btnQuickAdd = document.getElementById('btn-quick-add-emp');
     const btnRunPayroll = document.getElementById('btn-run-payroll');
+    const btnOpenAddReview = document.getElementById('btn-open-add-review');
+    const docTargetWrap = document.getElementById('doc-target-emp-wrap');
 
     if (user.role === 'EMPLOYEE') {
       if (navEmployees) navEmployees.style.display = 'none';
       if (navAudit) navAudit.style.display = 'none';
       if (btnQuickAdd) btnQuickAdd.style.display = 'none';
       if (btnRunPayroll) btnRunPayroll.style.display = 'none';
+      if (btnOpenAddReview) btnOpenAddReview.style.display = 'none';
+      if (docTargetWrap) docTargetWrap.style.display = 'none';
       if (navDashboard) navDashboard.querySelector('span').innerText = 'My Workspace';
       if (navPayroll) navPayroll.querySelector('span').innerText = 'My Payslips';
       if (navLeaves) navLeaves.querySelector('span').innerText = 'My Leaves & PTO';
+      if (navAttendance) navAttendance.querySelector('span').innerText = 'My Attendance';
+      if (navPerformance) navPerformance.querySelector('span').innerText = 'My Appraisals';
+      if (navDocuments) navDocuments.querySelector('span').innerText = 'My Documents';
     } else if (user.role === 'MANAGER') {
       if (navEmployees) navEmployees.style.display = 'flex';
       if (navAudit) navAudit.style.display = 'flex';
       if (btnQuickAdd) btnQuickAdd.style.display = 'inline-flex';
       if (btnRunPayroll) btnRunPayroll.style.display = 'none';
+      if (btnOpenAddReview) btnOpenAddReview.style.display = 'inline-flex';
+      if (docTargetWrap) docTargetWrap.style.display = 'block';
       if (navDashboard) navDashboard.querySelector('span').innerText = 'Dashboard';
       if (navPayroll) navPayroll.querySelector('span').innerText = 'Payroll Hub';
       if (navLeaves) navLeaves.querySelector('span').innerText = 'Leaves & PTO';
+      if (navAttendance) navAttendance.querySelector('span').innerText = 'Attendance';
+      if (navPerformance) navPerformance.querySelector('span').innerText = 'Performance';
+      if (navDocuments) navDocuments.querySelector('span').innerText = 'Document Vault';
     } else {
       if (navEmployees) navEmployees.style.display = 'flex';
       if (navAudit) navAudit.style.display = 'flex';
       if (btnQuickAdd) btnQuickAdd.style.display = 'inline-flex';
       if (btnRunPayroll) btnRunPayroll.style.display = 'inline-flex';
+      if (btnOpenAddReview) btnOpenAddReview.style.display = 'inline-flex';
+      if (docTargetWrap) docTargetWrap.style.display = 'block';
       if (navDashboard) navDashboard.querySelector('span').innerText = 'Dashboard';
       if (navPayroll) navPayroll.querySelector('span').innerText = 'Payroll Hub';
       if (navLeaves) navLeaves.querySelector('span').innerText = 'Leaves & PTO';
+      if (navAttendance) navAttendance.querySelector('span').innerText = 'Attendance';
+      if (navPerformance) navPerformance.querySelector('span').innerText = 'Performance';
+      if (navDocuments) navDocuments.querySelector('span').innerText = 'Document Vault';
     }
 
     // Set default month in payroll selector (current YYYY-MM)
@@ -88,6 +109,7 @@ class AppController {
 
     this.switchView('dashboard');
     this.loadCentersDropdowns();
+    this.loadNotifications();
   }
 
   // =========================================================================
@@ -166,6 +188,18 @@ class AppController {
     if (formChangePwd) {
       formChangePwd.addEventListener('submit', (e) => this.handleChangePassword(e));
     }
+    const formAddPerf = document.getElementById('form-add-performance');
+    if (formAddPerf) {
+      formAddPerf.addEventListener('submit', (e) => this.handleAddPerformanceReview(e));
+    }
+    const formAckPerf = document.getElementById('form-ack-performance');
+    if (formAckPerf) {
+      formAckPerf.addEventListener('submit', (e) => this.handleAckPerformanceReview(e));
+    }
+    const formUploadDoc = document.getElementById('form-upload-document');
+    if (formUploadDoc) {
+      formUploadDoc.addEventListener('submit', (e) => this.handleUploadDocument(e));
+    }
 
     // Dynamic Employee ID generation listeners on Center and DOJ change
     document.getElementById('add-ecen').addEventListener('input', () => this.debounce(() => this.refreshRecommendedEmployeeId(), 300));
@@ -176,6 +210,15 @@ class AppController {
     if (calcGrossInput) {
       calcGrossInput.addEventListener('input', () => this.calculateDynamicSalaryBreakdown());
     }
+
+    // Close notification dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const notifWrap = document.getElementById('notification-bell-wrap');
+      const notifDrop = document.getElementById('notification-dropdown');
+      if (notifWrap && notifDrop && !notifWrap.contains(e.target)) {
+        notifDrop.style.display = 'none';
+      }
+    });
 
     // Dismiss modals when clicking backdrop overlay
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -222,6 +265,10 @@ class AppController {
               ? 'Center workforce intelligence and operations overview'
               : 'Real-time workforce intelligence and operations overview')
       ],
+      attendance: [
+        api.user?.role === 'EMPLOYEE' ? 'My Attendance & Hours Tracker' : 'Attendance & Time Operations',
+        api.user?.role === 'EMPLOYEE' ? 'Track your daily check-in times and accumulated monthly work hours' : 'Enterprise daily check-in/out logs and active team roster'
+      ],
       employees: ['Employee Directory', 'Master records and profile management'],
       payroll: [
         api.user?.role === 'EMPLOYEE' ? 'My Payslips & Compensation' : 'Payroll Hub & Compensation',
@@ -230,6 +277,14 @@ class AppController {
       leaves: [
         api.user?.role === 'EMPLOYEE' ? 'My Leaves & Attendance' : 'Leaves & Attendance',
         api.user?.role === 'EMPLOYEE' ? 'Submit and track your time off applications' : 'Employee time-off requests and manager approvals'
+      ],
+      performance: [
+        api.user?.role === 'EMPLOYEE' ? 'My Performance & Appraisals' : 'Performance & Appraisals Hub',
+        api.user?.role === 'EMPLOYEE' ? 'Review quarterly evaluations and manager feedback' : 'Quarterly 360 appraisals, goal achievements, and scoring'
+      ],
+      documents: [
+        api.user?.role === 'EMPLOYEE' ? 'My Document Vault' : 'Document Vault & Compliance',
+        api.user?.role === 'EMPLOYEE' ? 'Upload and manage your contracts, ID proofs, and certifications' : 'Employee compliance file archive, ID proofs, and contracts'
       ],
       audit: ['Audit Vault', 'Immutable system activity and modification logs']
     };
@@ -242,9 +297,12 @@ class AppController {
 
   refreshCurrentView() {
     if (this.currentView === 'dashboard') this.loadDashboard();
+    else if (this.currentView === 'attendance') this.loadAttendanceData();
     else if (this.currentView === 'employees') this.loadEmployees();
     else if (this.currentView === 'payroll') this.loadPayroll();
     else if (this.currentView === 'leaves') this.loadLeaves();
+    else if (this.currentView === 'performance') this.loadPerformanceReviews();
+    else if (this.currentView === 'documents') this.loadDocuments();
     else if (this.currentView === 'audit') this.loadAuditLogs();
   }
 
@@ -1381,6 +1439,550 @@ class AppController {
     } catch (err) {
       this.showToast('Failed to load audit logs', 'error');
     }
+  }
+
+  // =========================================================================
+  // 7. Attendance Operations & Live Clock-In/Out
+  // =========================================================================
+  async loadAttendanceData() {
+    try {
+      const summary = await api.getAttendanceSummary();
+      
+      // Update Summary KPIs
+      const kpiDays = document.getElementById('att-kpi-days');
+      const kpiHours = document.getElementById('att-kpi-hours');
+      const kpiAvg = document.getElementById('att-kpi-avg');
+      const kpiPunct = document.getElementById('att-kpi-punctuality');
+
+      if (kpiDays) kpiDays.innerText = `${summary.total_days_present} Days`;
+      if (kpiHours) kpiHours.innerText = `${summary.total_working_hours} hrs`;
+      if (kpiAvg) kpiAvg.innerText = `${summary.average_daily_hours} hrs`;
+      if (kpiPunct) kpiPunct.innerText = `${summary.on_time_rate_percent}%`;
+
+      // Update Employee Widget Card state
+      this.updateAttendanceWidgetState(summary);
+
+      // Load History Table
+      await this.loadAttendanceHistory();
+
+      // If Manager/Admin, load Live Team Roster
+      if (api.user?.role !== 'EMPLOYEE') {
+        await this.loadLiveTeamStatus();
+      }
+    } catch (err) {
+      console.warn('Attendance load error:', err);
+    }
+  }
+
+  updateAttendanceWidgetState(summary) {
+    const badge = document.getElementById('emp-attendance-status-badge');
+    const timer = document.getElementById('emp-attendance-timer');
+    const details = document.getElementById('emp-attendance-details');
+    const btnIn = document.getElementById('btn-emp-clock-in');
+    const btnOut = document.getElementById('btn-emp-clock-out');
+
+    if (!badge || !timer) return;
+
+    if (summary.is_currently_clocked_in && summary.today_record) {
+      badge.innerText = 'ONLINE / ON DUTY';
+      badge.style.background = 'rgba(16, 185, 129, 0.2)';
+      badge.style.color = '#34d399';
+      if (btnIn) btnIn.disabled = true;
+      if (btnOut) btnOut.disabled = false;
+
+      const clockInTime = new Date(summary.today_record.clock_in);
+      if (details) {
+        details.innerText = `Clocked in at ${clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      }
+      this.startAttendanceStopwatch(summary.today_record.clock_in);
+    } else if (summary.today_record && summary.today_record.clock_out) {
+      badge.innerText = 'SHIFT COMPLETED';
+      badge.style.background = 'rgba(59, 130, 246, 0.2)';
+      badge.style.color = '#60a5fa';
+      if (btnIn) btnIn.disabled = false;
+      if (btnOut) btnOut.disabled = true;
+      if (details) {
+        details.innerText = `Completed ${summary.today_record.total_hours} hrs today`;
+      }
+      if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
+      const totalSec = Math.floor(summary.today_record.total_hours * 3600);
+      const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+      const secs = String(totalSec % 60).padStart(2, '0');
+      timer.innerText = `${hrs}:${mins}:${secs}`;
+    } else {
+      badge.innerText = 'NOT CLOCKED IN';
+      badge.style.background = 'rgba(100, 116, 139, 0.2)';
+      badge.style.color = '#94a3b8';
+      if (btnIn) btnIn.disabled = false;
+      if (btnOut) btnOut.disabled = true;
+      if (details) details.innerText = 'Shift not started';
+      if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
+      timer.innerText = '00:00:00';
+    }
+  }
+
+  startAttendanceStopwatch(clockInIso) {
+    if (this.attendanceStopwatchInterval) clearInterval(this.attendanceStopwatchInterval);
+    const clockInTime = new Date(clockInIso).getTime();
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsedMs = Math.max(0, now - clockInTime);
+      const totalSec = Math.floor(elapsedMs / 1000);
+      const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+      const secs = String(totalSec % 60).padStart(2, '0');
+
+      const timer = document.getElementById('emp-attendance-timer');
+      if (timer) timer.innerText = `${hrs}:${mins}:${secs}`;
+    };
+
+    updateTimer();
+    this.attendanceStopwatchInterval = setInterval(updateTimer, 1000);
+  }
+
+  async handleClockIn() {
+    try {
+      await api.clockIn();
+      this.showToast('Successfully clocked in! Work timer started.', 'success');
+      await this.loadAttendanceData();
+    } catch (err) {
+      this.showToast(err.message || 'Clock in failed', 'error');
+    }
+  }
+
+  async handleClockOut() {
+    const confirmed = await this.promptCrucialAction(
+      'Clock Out & End Shift',
+      'Are you ready to clock out and finalize your working hours for today?',
+      'Clock Out',
+      'Cancel'
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await api.clockOut();
+      this.showToast(`Clocked out successfully! Logged ${res.total_hours} hrs today.`, 'success');
+      await this.loadAttendanceData();
+    } catch (err) {
+      this.showToast(err.message || 'Clock out failed', 'error');
+    }
+  }
+
+  async loadAttendanceHistory() {
+    try {
+      const centerFilter = document.getElementById('att-center-filter')?.value || 'ALL';
+      const history = await api.getAttendanceHistory({ center: centerFilter, page_size: 50 });
+      const tbody = document.getElementById('attendance-table-body');
+      if (!tbody) return;
+
+      if (history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:30px;">No attendance records found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = history.map(rec => {
+        const inTime = rec.clock_in ? new Date(rec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const outTime = rec.clock_out ? new Date(rec.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '<span style="color:#34d399; font-weight:600;">ACTIVE</span>';
+        
+        let statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399;">PRESENT</span>`;
+        if (rec.status === 'OVERTIME') statusBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">OVERTIME</span>`;
+        else if (rec.status === 'HALF_DAY') statusBadge = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24;">HALF DAY</span>`;
+        else if (rec.status === 'LATE') statusBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171;">LATE</span>`;
+
+        return `
+          <tr>
+            <td><strong>${rec.work_date}</strong></td>
+            <td><b>${rec.employee_name || '#' + rec.employee_id}</b> <small style="color:var(--text-muted);">(#${rec.employee_id})</small></td>
+            <td>${rec.center || 'Corporate HQ'}</td>
+            <td><code>${inTime}</code></td>
+            <td><code>${outTime}</code></td>
+            <td><strong style="color:${rec.total_hours >= 8 ? '#34d399' : '#94a3b8'}">${rec.total_hours} hrs</strong></td>
+            <td>${statusBadge}</td>
+            <td><span style="font-size:0.75rem; color:var(--text-muted);">${rec.notes || rec.ip_address || '—'}</span></td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.warn('Attendance history error:', err);
+    }
+  }
+
+  async loadLiveTeamStatus() {
+    try {
+      const data = await api.getLiveTeamStatus();
+      const board = document.getElementById('att-live-team-board');
+      const list = document.getElementById('att-live-team-list');
+      if (!board || !list) return;
+
+      board.style.display = 'block';
+
+      if (!data.active_employees || data.active_employees.length === 0) {
+        list.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; padding:10px;">No employees are currently checked in today.</div>`;
+        return;
+      }
+
+      list.innerHTML = data.active_employees.map(emp => `
+        <div class="live-on-duty-badge">
+          <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 8px #10b981;"></span>
+          <div>
+            <strong style="color:#fff;">${emp.employee_name || '#' + emp.employee_id}</strong>
+            <div style="font-size:0.72rem; color:var(--text-muted);">${emp.center || 'HQ'} • In since ${new Date(emp.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.warn('Live team status error:', err);
+    }
+  }
+
+  // =========================================================================
+  // 8. Performance Reviews & Appraisals
+  // =========================================================================
+  async loadPerformanceReviews() {
+    try {
+      const reviews = await api.getPerformanceReviews();
+      const container = document.getElementById('performance-reviews-container');
+      if (!container) return;
+
+      if (reviews.length === 0) {
+        container.innerHTML = `
+          <div class="card" style="text-align:center; padding:40px; color:var(--text-muted);">
+            <h3>No Performance Appraisals Published Yet</h3>
+            <p style="font-size:0.85rem; margin-top:6px;">Performance appraisals conducted by managers will appear here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = reviews.map(rev => {
+        const stars = '★'.repeat(Math.round(rev.rating)) + '☆'.repeat(Math.max(0, 5 - Math.round(rev.rating)));
+        let goalBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399;">${rev.goals_met}</span>`;
+        if (rev.goals_met === 'EXCEEDED') goalBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">🌟 EXCEEDED</span>`;
+        else if (rev.goals_met === 'NEEDS_IMPROVEMENT') goalBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171;">NEEDS IMPROVEMENT</span>`;
+
+        const isOwnReview = api.user?.role === 'EMPLOYEE' && rev.employee_id === api.user?.employee_id;
+        const ackSection = rev.is_acknowledged
+          ? `<div style="margin-top:14px; padding:10px 14px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2); border-radius:6px; font-size:0.8rem; color:#34d399;">
+               ✓ <b>Acknowledged by Employee</b> on ${new Date(rev.acknowledged_at).toLocaleDateString()}
+               ${rev.employee_comments ? `<div style="color:var(--text-secondary); margin-top:4px;"><i>"${rev.employee_comments}"</i></div>` : ''}
+             </div>`
+          : (isOwnReview
+              ? `<div style="margin-top:14px;">
+                   <button class="btn btn-primary btn-sm" onclick="app.openAckReviewModal(${rev.id})">Acknowledge Appraisal</button>
+                 </div>`
+              : `<div style="margin-top:14px; font-size:0.8rem; color:var(--text-muted);">⏳ Pending employee acknowledgement</div>`);
+
+        return `
+          <div class="review-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+              <div>
+                <div style="font-size:1.1rem; font-weight:700; color:#fff;">
+                  ${rev.employee_name || 'Employee #' + rev.employee_id} 
+                  <small style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">(${rev.position || 'Staff'} • ${rev.center || 'HQ'})</small>
+                </div>
+                <div style="font-size:0.82rem; color:var(--primary); font-weight:600; margin-top:2px;">Cycle: ${rev.review_period}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="star-rating-display">${stars} <span style="font-size:1rem; font-weight:700; color:#fff;">${rev.rating.toFixed(1)}/5.0</span></div>
+                <div style="margin-top:4px;">${goalBadge}</div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin: 12px 0;">
+              ${rev.strengths ? `
+                <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:6px; border-left:3px solid #34d399;">
+                  <div style="font-size:0.75rem; color:#34d399; font-weight:700; text-transform:uppercase;">Key Strengths</div>
+                  <div style="font-size:0.84rem; color:var(--text-secondary); margin-top:4px; line-height:1.4;">${rev.strengths}</div>
+                </div>` : ''}
+              ${rev.areas_for_improvement ? `
+                <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:6px; border-left:3px solid #f59e0b;">
+                  <div style="font-size:0.75rem; color:#fbbf24; font-weight:700; text-transform:uppercase;">Areas for Development</div>
+                  <div style="font-size:0.84rem; color:var(--text-secondary); margin-top:4px; line-height:1.4;">${rev.areas_for_improvement}</div>
+                </div>` : ''}
+            </div>
+
+            <div style="background:rgba(15,23,42,0.6); padding:14px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); margin-top:10px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Manager Feedback</div>
+              <div style="font-size:0.88rem; color:#f1f5f9; margin-top:4px; line-height:1.5;">${rev.manager_feedback}</div>
+            </div>
+
+            ${ackSection}
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      console.warn('Performance reviews error:', err);
+    }
+  }
+
+  openAddReviewModal() {
+    this.closeModals();
+    const form = document.getElementById('form-add-performance');
+    if (form) form.reset();
+    const modal = document.getElementById('modal-add-performance');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+  }
+
+  async handleAddPerformanceReview(e) {
+    e.preventDefault();
+    const data = {
+      employee_id: parseInt(document.getElementById('review-emp-id').value),
+      review_period: document.getElementById('review-period').value.trim(),
+      rating: parseFloat(document.getElementById('review-rating').value),
+      goals_met: document.getElementById('review-goals').value,
+      strengths: document.getElementById('review-strengths').value.trim() || null,
+      areas_for_improvement: document.getElementById('review-areas').value.trim() || null,
+      manager_feedback: document.getElementById('review-feedback').value.trim(),
+      status: 'FINALIZED'
+    };
+
+    try {
+      await api.createPerformanceReview(data);
+      this.showToast('Performance appraisal published successfully!', 'success');
+      this.closeModals();
+      await this.loadPerformanceReviews();
+    } catch (err) {
+      this.showToast(err.message || 'Failed to publish review', 'error');
+    }
+  }
+
+  openAckReviewModal(reviewId) {
+    this.closeModals();
+    document.getElementById('ack-review-id').value = reviewId;
+    const modal = document.getElementById('modal-ack-performance');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+  }
+
+  async handleAckPerformanceReview(e) {
+    e.preventDefault();
+    const reviewId = document.getElementById('ack-review-id').value;
+    const comments = document.getElementById('ack-employee-comments').value.trim();
+
+    try {
+      await api.acknowledgePerformanceReview(reviewId, comments);
+      this.showToast('Appraisal acknowledged successfully!', 'success');
+      this.closeModals();
+      await this.loadPerformanceReviews();
+    } catch (err) {
+      this.showToast(err.message || 'Acknowledgement failed', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 9. Document Vault & File Management
+  // =========================================================================
+  async loadDocuments() {
+    try {
+      const eid = api.user?.employee_id;
+      if (!eid) return;
+
+      const docs = await api.getEmployeeDocuments(eid);
+      const grid = document.getElementById('documents-grid');
+      if (!grid) return;
+
+      if (docs.length === 0) {
+        grid.innerHTML = `
+          <div class="card" style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
+            <h3>Document Vault is Empty</h3>
+            <p style="font-size:0.85rem; margin-top:6px;">Upload your ID proof, degree certificates, and signed contracts for permanent compliance storage.</p>
+            <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()" style="margin-top:14px;">+ Upload First File</button>
+          </div>
+        `;
+        return;
+      }
+
+      const iconMap = {
+        ID_PROOF: '🪪',
+        CONTRACT: '📝',
+        CERTIFICATE: '🎓',
+        TAX_FORM: '📑',
+        RESUME: '📄',
+        OTHER: '📁'
+      };
+
+      grid.innerHTML = docs.map(doc => {
+        const icon = iconMap[doc.document_type] || '📁';
+        const sizeKb = (doc.file_size / 1024).toFixed(1);
+        const downloadUrl = api.getDocumentDownloadUrl(doc.id);
+
+        return `
+          <div class="doc-card">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                <div class="doc-icon-wrap">${icon}</div>
+                <span class="badge badge-primary">${doc.document_type}</span>
+              </div>
+              <div style="font-weight:700; font-size:0.95rem; color:#fff; line-height:1.3;">${doc.title}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${doc.file_name} (${sizeKb} KB)</div>
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">Uploaded: ${new Date(doc.created_at).toLocaleDateString()}</div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
+              <a href="${downloadUrl}" target="_blank" class="btn btn-secondary btn-sm" style="flex:1; text-align:center; text-decoration:none; justify-content:center;">
+                ⬇ Download
+              </a>
+              <button class="btn btn-secondary btn-sm" onclick="app.handleDeleteDocument(${doc.id}, '${doc.title.replace(/'/g, "\\'")}')" style="color:#f87171;">
+                ✕
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      console.warn('Load documents error:', err);
+    }
+  }
+
+  openUploadDocModal() {
+    this.closeModals();
+    const form = document.getElementById('form-upload-document');
+    if (form) form.reset();
+    const modal = document.getElementById('modal-upload-document');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+  }
+
+  async handleUploadDocument(e) {
+    e.preventDefault();
+    const title = document.getElementById('doc-title').value.trim();
+    const type = document.getElementById('doc-type').value;
+    const fileInput = document.getElementById('doc-file-input');
+    const targetEid = document.getElementById('doc-target-eid')?.value;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      this.showToast('Please choose a file to upload', 'warning');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('document_type', type);
+    formData.append('file', fileInput.files[0]);
+    if (targetEid) formData.append('target_employee_id', targetEid);
+
+    const btnSubmit = document.getElementById('btn-submit-doc-upload');
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = 'Uploading...';
+    }
+
+    try {
+      await api.uploadDocument(formData);
+      this.showToast('Document uploaded and archived securely!', 'success');
+      this.closeModals();
+      await this.loadDocuments();
+    } catch (err) {
+      this.showToast(err.message || 'Upload failed', 'error');
+    } finally {
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Upload File';
+      }
+    }
+  }
+
+  async handleDeleteDocument(docId, title) {
+    const confirmed = await this.promptCrucialAction(
+      'Delete Compliance Document',
+      `Are you sure you want to permanently delete "${title}" from the document vault?`,
+      'Delete Document',
+      'Keep File'
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.deleteDocument(docId);
+      this.showToast('Document deleted.', 'info');
+      await this.loadDocuments();
+    } catch (err) {
+      this.showToast(err.message || 'Delete failed', 'error');
+    }
+  }
+
+  // =========================================================================
+  // 10. Notification Center & Alerts
+  // =========================================================================
+  async loadNotifications() {
+    if (!api.token) return;
+    try {
+      const feed = await api.getNotifications();
+      const badge = document.getElementById('notification-badge');
+      const list = document.getElementById('notification-feed-list');
+
+      if (badge) {
+        if (feed.unread_count > 0) {
+          badge.innerText = feed.unread_count > 9 ? '9+' : feed.unread_count;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      if (list) {
+        if (!feed.notifications || feed.notifications.length === 0) {
+          list.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:0.8rem;">No notifications right now.</div>`;
+          return;
+        }
+
+        list.innerHTML = feed.notifications.map(n => `
+          <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="app.handleNotificationClick(${n.id}, '${n.action_url || ''}')">
+            <div class="notification-item-title">${n.title}</div>
+            <div class="notification-item-msg">${n.message}</div>
+            <div class="notification-item-time">${new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • ${new Date(n.created_at).toLocaleDateString()}</div>
+          </div>
+        `).join('');
+      }
+    } catch (err) {
+      console.warn('Notifications poll error:', err);
+    }
+  }
+
+  toggleNotificationDropdown() {
+    const drop = document.getElementById('notification-dropdown');
+    if (!drop) return;
+    drop.style.display = drop.style.display === 'none' ? 'flex' : 'none';
+  }
+
+  async handleNotificationClick(notifId, actionUrl) {
+    try {
+      await api.markNotificationRead(notifId);
+      await this.loadNotifications();
+      if (actionUrl) {
+        const view = actionUrl.replace('#', '');
+        if (view) this.switchView(view);
+      }
+      const drop = document.getElementById('notification-dropdown');
+      if (drop) drop.style.display = 'none';
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  async markAllNotificationsRead() {
+    try {
+      await api.markAllNotificationsRead();
+      this.showToast('All notifications marked as read.', 'info');
+      await this.loadNotifications();
+    } catch (err) {
+      this.showToast('Failed to mark notifications', 'error');
+    }
+  }
+
+  startNotificationPolling() {
+    if (this.notificationInterval) clearInterval(this.notificationInterval);
+    this.notificationInterval = setInterval(() => {
+      if (api.token) this.loadNotifications();
+    }, 25000);
   }
 
   // =========================================================================

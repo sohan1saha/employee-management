@@ -22,6 +22,10 @@ from app.api.payroll_router import router as payroll_router
 from app.api.leave_router import router as leave_router
 from app.api.analytics_router import router as analytics_router
 from app.api.audit_router import router as audit_router
+from app.api.attendance_router import router as attendance_router
+from app.api.performance_router import router as performance_router
+from app.api.document_router import router as document_router
+from app.api.notification_router import router as notification_router
 from app.services.cache_service import cache
 from app.services.metrics_service import metrics_collector
 from app.core.emp_mgmt_core import cli_menu
@@ -158,6 +162,10 @@ app.include_router(payroll_router, prefix=settings.API_V1_STR)
 app.include_router(leave_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
 app.include_router(audit_router, prefix=settings.API_V1_STR)
+app.include_router(attendance_router, prefix=settings.API_V1_STR)
+app.include_router(performance_router, prefix=settings.API_V1_STR)
+app.include_router(document_router, prefix=settings.API_V1_STR)
+app.include_router(notification_router, prefix=settings.API_V1_STR)
 
 
 # =============================================================================

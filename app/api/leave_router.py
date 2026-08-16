@@ -11,6 +11,7 @@ from app.schemas.leave_schema import LeaveCreate, LeaveStatusUpdate, LeaveRespon
 from app.api.deps import get_current_user, require_roles, get_user_scope_center, get_request_id
 from app.services.audit_service import record_audit
 from app.services.cache_service import cache
+from app.services.email_service import notify_leave_status
 
 router = APIRouter(prefix="/leaves", tags=["Leaves & Attendance"])
 
@@ -143,6 +144,17 @@ def review_leave_request(
 
     db.commit()
     db.refresh(leave_req)
+
+    # Dispatch In-App Notification & Email
+    reviewer_name = current_user.employee.ename if current_user.employee else f"Manager #{current_user.employee_id}"
+    notify_leave_status(
+        db=db,
+        employee_id=leave_req.employee_id,
+        leave_type=leave_req.leave_type,
+        status=status_in.status,
+        days_count=leave_req.days_count,
+        reviewer_name=reviewer_name
+    )
 
     record_audit(
         db=db,

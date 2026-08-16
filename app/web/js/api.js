@@ -272,6 +272,100 @@ class ApiClient {
     const query = new URLSearchParams(params).toString();
     return await this.request(`/audit/logs${query ? '?' + query : ''}`);
   }
+
+  // --- Attendance Endpoints ---
+  async clockIn(notes = '') {
+    return await this.request('/attendance/clock-in', {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+  }
+
+  async clockOut(notes = '') {
+    return await this.request('/attendance/clock-out', {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+  }
+
+  async getAttendanceSummary(employeeId = null) {
+    const query = employeeId ? `?employee_id=${employeeId}` : '';
+    return await this.request(`/attendance/summary${query}`);
+  }
+
+  async getAttendanceHistory(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return await this.request(`/attendance/history${query ? '?' + query : ''}`);
+  }
+
+  async getLiveTeamStatus() {
+    return await this.request('/attendance/live-status');
+  }
+
+  // --- Performance Endpoints ---
+  async getPerformanceReviews(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return await this.request(`/performance/reviews${query ? '?' + query : ''}`);
+  }
+
+  async createPerformanceReview(data) {
+    return await this.request('/performance/reviews', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async acknowledgePerformanceReview(reviewId, employeeComments = '') {
+    return await this.request(`/performance/reviews/${reviewId}/acknowledge`, {
+      method: 'PATCH',
+      body: JSON.stringify({ employee_comments: employeeComments })
+    });
+  }
+
+  // --- Document Vault Endpoints ---
+  async uploadDocument(formData) {
+    // Custom multipart request (bypasses JSON stringify)
+    const token = this.getAccessToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${this.baseUrl}/documents/upload`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Document upload failed');
+    }
+    return await res.json();
+  }
+
+  async getEmployeeDocuments(employeeId) {
+    return await this.request(`/documents/employee/${employeeId}`);
+  }
+
+  async deleteDocument(docId) {
+    return await this.request(`/documents/${docId}`, { method: 'DELETE' });
+  }
+
+  getDocumentDownloadUrl(docId) {
+    return `${this.baseUrl}/documents/${docId}/download`;
+  }
+
+  // --- Notification Endpoints ---
+  async getNotifications() {
+    return await this.request('/notifications');
+  }
+
+  async markNotificationRead(notifId) {
+    return await this.request(`/notifications/${notifId}/read`, { method: 'PATCH' });
+  }
+
+  async markAllNotificationsRead() {
+    return await this.request('/notifications/mark-all-read', { method: 'POST' });
+  }
 }
 
 const api = new ApiClient();
