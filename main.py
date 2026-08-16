@@ -233,7 +233,11 @@ if os.path.exists(web_dir):
 
 def run_web():
     """Launch the FastAPI Web Application & API."""
-    port = int(os.environ.get("PORT", 8000))
+    port_str = str(os.environ.get("PORT", "8000")).strip()
+    try:
+        port = int(port_str)
+    except Exception:
+        port = 8000
     host = "0.0.0.0"
     print("=" * 60)
     print(f"[+] Launching {settings.PROJECT_NAME}")
@@ -244,7 +248,7 @@ def run_web():
         "main:app",
         host=host,
         port=port,
-        reload=settings.DEBUG,
+        reload=False,
         forwarded_allow_ips="*",
         proxy_headers=True
     )
