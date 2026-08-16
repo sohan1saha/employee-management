@@ -292,7 +292,32 @@ class AppController {
     document.getElementById('page-title').innerText = titles[viewName]?.[0] || 'Dashboard';
     document.getElementById('page-subtitle').innerText = titles[viewName]?.[1] || '';
 
+    this.closeMobileSidebar();
     this.refreshCurrentView();
+  }
+
+  toggleMobileSidebar() {
+    const sidebar = document.getElementById('app-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!sidebar) return;
+    sidebar.classList.toggle('mobile-open');
+    if (backdrop) {
+      if (sidebar.classList.contains('mobile-open')) {
+        backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      } else {
+        backdrop.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  }
+
+  closeMobileSidebar() {
+    const sidebar = document.getElementById('app-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.style.overflow = '';
   }
 
   refreshCurrentView() {

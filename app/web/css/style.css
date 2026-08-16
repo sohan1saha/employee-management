@@ -1183,3 +1183,344 @@ body {
   justify-content: center;
   font-size: 1.3rem;
 }
+
+/* =========================================================================
+   Mobile Navigation & Responsive Drawer
+   ========================================================================= */
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-sidebar-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 38px;
+  height: 38px;
+  padding: 9px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.btn-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.hamburger-bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: var(--text-primary);
+  border-radius: 2px;
+}
+
+.sidebar-mobile-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.sidebar-mobile-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* =========================================================================
+   Responsive Breakpoints & Mobile Optimization
+   ========================================================================= */
+
+/* Tablet & Mobile Screens (<= 992px) */
+@media (max-width: 992px) {
+  .app-container {
+    flex-direction: column;
+    height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 290px;
+    max-width: 85vw;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.85);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-mobile-close {
+    display: flex;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  .sidebar-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .btn-sidebar-toggle {
+    display: flex;
+  }
+
+  .top-bar {
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .top-bar-center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+
+  .top-actions {
+    margin-left: auto;
+  }
+
+  .content-body {
+    padding: 20px 16px;
+    gap: 20px;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Mobile Screens (<= 768px) */
+@media (max-width: 768px) {
+  .top-bar {
+    padding: 12px 14px;
+    position: sticky;
+  }
+
+  .page-title {
+    font-size: 1.15rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.75rem;
+    display: none;
+  }
+
+  .live-clock-widget {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .top-actions {
+    width: 100%;
+    order: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .top-actions .btn {
+    flex: 1 1 auto;
+    font-size: 0.78rem;
+    padding: 7px 10px;
+    justify-content: center;
+  }
+
+  .content-body {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .kpi-card {
+    padding: 16px 12px;
+  }
+
+  .kpi-label {
+    font-size: 0.72rem;
+  }
+
+  .kpi-value {
+    font-size: 1.25rem;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .chart-container {
+    height: 250px;
+  }
+
+  .attendance-widget-card > div {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 14px;
+  }
+
+  .attendance-widget-card > div > div:last-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+  }
+
+  .attendance-stopwatch {
+    font-size: 1.4rem;
+  }
+
+  .table-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .select-custom,
+  .table-controls .btn,
+  .table-controls input {
+    width: 100%;
+  }
+
+  .table-responsive {
+    border-radius: var(--radius-sm);
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -4px;
+    width: calc(100% + 8px);
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 22px 16px;
+    max-height: 88vh;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .modal-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .login-wrapper {
+    padding: 14px;
+  }
+
+  .login-card {
+    padding: 24px 18px;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-md);
+  }
+
+  .notification-dropdown {
+    width: calc(100vw - 24px);
+    right: -10px;
+  }
+}
+
+/* Small Smartphone Displays (<= 480px) */
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .emp-profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .attendance-widget-card > div > div:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .attendance-widget-card > div > div:last-child > div:last-child {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .attendance-widget-card > div > div:last-child > div:last-child button {
+    flex: 1;
+  }
+}
+

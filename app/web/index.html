@@ -55,15 +55,18 @@
   <div class="app-container" id="app-container" style="display: none;">
     
     <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
       <div>
         <div class="sidebar-header">
-          <a href="#" class="brand">
-            <div>
-              <div class="brand-title">StaffSync 360</div>
-              <div class="brand-subtitle">Enterprise HRMS</div>
-            </div>
-          </a>
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <a href="#" class="brand">
+              <div>
+                <div class="brand-title">StaffSync 360</div>
+                <div class="brand-subtitle">Enterprise HRMS</div>
+              </div>
+            </a>
+            <button type="button" class="sidebar-mobile-close" id="btn-sidebar-close" onclick="app.closeMobileSidebar()" aria-label="Close Sidebar">✕</button>
+          </div>
         </div>
 
         <nav class="sidebar-nav">
@@ -113,14 +116,24 @@
       </div>
     </aside>
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="app.closeMobileSidebar()"></div>
+
     <!-- Main Workspace -->
     <main class="main-content">
       
       <!-- Top Navigation Bar -->
       <header class="top-bar">
-        <div>
-          <h1 class="page-title" id="page-title">Executive Dashboard</h1>
-          <p class="page-subtitle" id="page-subtitle">Real-time workforce intelligence and operations overview</p>
+        <div class="top-bar-left">
+          <button type="button" class="btn-sidebar-toggle" id="btn-sidebar-toggle" onclick="app.toggleMobileSidebar()" aria-label="Toggle navigation menu">
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+          </button>
+          <div>
+            <h1 class="page-title" id="page-title">Executive Dashboard</h1>
+            <p class="page-subtitle" id="page-subtitle">Real-time workforce intelligence and operations overview</p>
+          </div>
         </div>
 
         <!-- Live Real-Time Clock & Date Display -->
