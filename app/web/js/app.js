@@ -1244,13 +1244,33 @@ class AppController {
       return;
     }
 
-    if (newPwd.length < 6) {
-      this.showToast('New password must be at least 6 characters', 'warning');
+    if (newPwd.length < 8) {
+      this.showToast('New password must be at least 8 characters long', 'warning');
+      return;
+    }
+
+    if (!/[A-Z]/.test(newPwd)) {
+      this.showToast('New password must contain at least one uppercase letter (A-Z)', 'warning');
+      return;
+    }
+
+    if (!/[a-z]/.test(newPwd)) {
+      this.showToast('New password must contain at least one lowercase letter (a-z)', 'warning');
+      return;
+    }
+
+    if (!/\d/.test(newPwd)) {
+      this.showToast('New password must contain at least one number (0-9)', 'warning');
+      return;
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPwd)) {
+      this.showToast('New password must contain at least one special character (!@#$%^&*)', 'warning');
       return;
     }
 
     if (newPwd === oldPwd) {
-      this.showToast('New password cannot be identical to old password', 'warning');
+      this.showToast('New password cannot be identical to current password', 'warning');
       return;
     }
 

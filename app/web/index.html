@@ -749,18 +749,18 @@
         <div class="form-group">
           <label class="form-label" for="pwd-new">New Password</label>
           <div class="password-input-wrap">
-            <input type="password" id="pwd-new" class="form-input" placeholder="Enter new password (min. 6 chars)" minlength="6" required>
+            <input type="password" id="pwd-new" class="form-input" placeholder="Enter new password (min. 8 chars, A-Z, 0-9, special)" minlength="8" required>
             <button type="button" id="btn-toggle-new-pwd" class="password-toggle-btn" onclick="app.togglePasswordVisibility('pwd-new', 'btn-toggle-new-pwd')">Show</button>
           </div>
         </div>
         <div class="form-group">
           <label class="form-label" for="pwd-confirm">Re-enter New Password</label>
           <div class="password-input-wrap">
-            <input type="password" id="pwd-confirm" class="form-input" placeholder="Re-enter new password" minlength="6" required>
+            <input type="password" id="pwd-confirm" class="form-input" placeholder="Re-enter new password" minlength="8" required>
             <button type="button" id="btn-toggle-confirm-pwd" class="password-toggle-btn" onclick="app.togglePasswordVisibility('pwd-confirm', 'btn-toggle-confirm-pwd')">Show</button>
           </div>
-          <small style="color: var(--text-muted); font-size: 0.76rem; display: block; margin-top: 4px;">
-            Password must be at least 6 characters long and different from current password.
+          <small style="color: var(--text-muted); font-size: 0.76rem; display: block; margin-top: 4px; line-height: 1.4;">
+            Minimum 8 characters, including uppercase, lowercase, number and special character.
           </small>
         </div>
         <div class="modal-actions" style="margin-top: 20px;">
