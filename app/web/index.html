@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apex HRMS — Enterprise Workforce & Payroll</title>
   <meta name="description" content="Apex HRMS — Next-Generation Enterprise Workforce Intelligence, Automated Payroll & Operations Platform">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23d946ef'/></linearGradient></defs><rect width='100' height='100' rx='24' fill='url(%23g)'/><text x='50' y='70' font-family='system-ui,sans-serif' font-size='62' font-weight='900' fill='white' text-anchor='middle'>A</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='bg' x1='0' y1='0' x2='48' y2='48'><stop offset='0%' stop-color='%231e1b4b'/><stop offset='100%' stop-color='%230f172a'/></linearGradient><linearGradient id='wL' x1='12' y1='38' x2='24' y2='8'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%236366f1'/></linearGradient><linearGradient id='wR' x1='24' y1='8' x2='36' y2='38'><stop offset='0%' stop-color='%23818cf8'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient><linearGradient id='bm' x1='12' y1='28' x2='36' y2='28'><stop offset='0%' stop-color='%2300f5ff'/><stop offset='100%' stop-color='%23d946ef'/></linearGradient></defs><rect width='48' height='48' rx='12' fill='url(%23bg)'/><path d='M24 7L8 37H15L24 19.5L27 25.5H31L24 7Z' fill='url(%23wL)'/><path d='M24 7L40 37H33L24 19.5L28 12.5L24 7Z' fill='url(%23wR)'/><path d='M13 29H35L32 33H16L13 29Z' fill='url(%23bm)'/><circle cx='24' cy='7.5' r='1.8' fill='%23ffffff'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -27,7 +27,45 @@
   <div id="login-overlay" class="login-wrapper">
     <div class="login-card">
       <div class="login-header">
-        <div class="brand-icon-lg">A</div>
+        <div class="brand-icon-lg">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="apexGradBgLg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#0f172a" stop-opacity="0.98"/>
+              </linearGradient>
+              <linearGradient id="apexGradBorderLg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#818cf8" stop-opacity="0.9"/>
+                <stop offset="50%" stop-color="#c084fc" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#ec4899" stop-opacity="0.9"/>
+              </linearGradient>
+              <linearGradient id="apexWingLeftLg" x1="12" y1="38" x2="24" y2="8" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#3b82f6"/>
+                <stop offset="50%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#38bdf8"/>
+              </linearGradient>
+              <linearGradient id="apexWingRightLg" x1="24" y1="8" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#818cf8"/>
+                <stop offset="50%" stop-color="#a855f7"/>
+                <stop offset="100%" stop-color="#f43f5e"/>
+              </linearGradient>
+              <linearGradient id="apexBeamLg" x1="12" y1="28" x2="36" y2="28" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#00f5ff"/>
+                <stop offset="100%" stop-color="#d946ef"/>
+              </linearGradient>
+              <filter id="apexGlowLg" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#6366f1" flood-opacity="0.65"/>
+              </filter>
+            </defs>
+            <rect x="1" y="1" width="46" height="46" rx="14" fill="url(#apexGradBgLg)" stroke="url(#apexGradBorderLg)" stroke-width="1.8"/>
+            <g filter="url(#apexGlowLg)">
+              <path d="M24 7L8 37H15L24 19.5L27 25.5H31L24 7Z" fill="url(#apexWingLeftLg)"/>
+              <path d="M24 7L40 37H33L24 19.5L28 12.5L24 7Z" fill="url(#apexWingRightLg)"/>
+              <path d="M13 29H35L32 33H16L13 29Z" fill="url(#apexBeamLg)"/>
+              <circle cx="24" cy="7.5" r="1.8" fill="#ffffff"/>
+            </g>
+          </svg>
+        </div>
         <h2 style="font-size: 1.65rem; font-weight: 800; color: #fff; letter-spacing: -0.5px;">Apex HRMS</h2>
         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 6px;">Enterprise Workforce & Payroll Platform</p>
       </div>
@@ -62,7 +100,45 @@
         <div class="sidebar-header">
           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <a href="#" class="brand">
-              <div class="brand-icon">A</div>
+              <div class="brand-icon">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="apexGradBgSb" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.95"/>
+                      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.98"/>
+                    </linearGradient>
+                    <linearGradient id="apexGradBorderSb" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.9"/>
+                      <stop offset="50%" stop-color="#c084fc" stop-opacity="0.5"/>
+                      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.9"/>
+                    </linearGradient>
+                    <linearGradient id="apexWingLeftSb" x1="12" y1="38" x2="24" y2="8" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#3b82f6"/>
+                      <stop offset="50%" stop-color="#6366f1"/>
+                      <stop offset="100%" stop-color="#38bdf8"/>
+                    </linearGradient>
+                    <linearGradient id="apexWingRightSb" x1="24" y1="8" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#818cf8"/>
+                      <stop offset="50%" stop-color="#a855f7"/>
+                      <stop offset="100%" stop-color="#f43f5e"/>
+                    </linearGradient>
+                    <linearGradient id="apexBeamSb" x1="12" y1="28" x2="36" y2="28" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00f5ff"/>
+                      <stop offset="100%" stop-color="#d946ef"/>
+                    </linearGradient>
+                    <filter id="apexGlowSb" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#6366f1" flood-opacity="0.6"/>
+                    </filter>
+                  </defs>
+                  <rect x="1" y="1" width="46" height="46" rx="12" fill="url(#apexGradBgSb)" stroke="url(#apexGradBorderSb)" stroke-width="1.5"/>
+                  <g filter="url(#apexGlowSb)">
+                    <path d="M24 7L8 37H15L24 19.5L27 25.5H31L24 7Z" fill="url(#apexWingLeftSb)"/>
+                    <path d="M24 7L40 37H33L24 19.5L28 12.5L24 7Z" fill="url(#apexWingRightSb)"/>
+                    <path d="M13 29H35L32 33H16L13 29Z" fill="url(#apexBeamSb)"/>
+                    <circle cx="24" cy="7.5" r="1.8" fill="#ffffff"/>
+                  </g>
+                </svg>
+              </div>
               <div>
                 <div class="brand-title">Apex HRMS</div>
                 <div class="brand-subtitle">Enterprise Platform</div>
