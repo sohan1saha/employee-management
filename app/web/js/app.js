@@ -1390,6 +1390,10 @@ class AppController {
     });
   }
 
+  promptCrucialAction(title, message, proceedText = "Proceed", cancelText = "Exit") {
+    return this.confirmAction({ title, message, proceedText });
+  }
+
   executeConfirmAction() {
     const modal = document.getElementById('modal-confirm-action');
     if (modal) {
@@ -1582,12 +1586,12 @@ class AppController {
   }
 
   async handleClockOut() {
-    const confirmed = await this.promptCrucialAction(
-      'Clock Out & End Shift',
-      'Are you ready to clock out and finalize your working hours for today?',
-      'Clock Out',
-      'Cancel'
-    );
+    const confirmed = await this.confirmAction({
+      title: 'Clock Out & End Shift',
+      message: 'Are you ready to clock out and finalize your working hours for today?',
+      proceedText: 'Clock Out',
+      badge: 'ATTENDANCE SHIFT CLOSURE'
+    });
     if (!confirmed) return;
 
     if (this.attendanceStopwatchInterval) {
@@ -1926,12 +1930,13 @@ class AppController {
   }
 
   async handleDeleteDocument(docId, title) {
-    const confirmed = await this.promptCrucialAction(
-      'Delete Compliance Document',
-      `Are you sure you want to permanently delete "${title}" from the document vault?`,
-      'Delete Document',
-      'Keep File'
-    );
+    const confirmed = await this.confirmAction({
+      title: 'Delete Compliance Document',
+      message: `Are you sure you want to permanently delete <b>"${title}"</b> from the document vault?`,
+      proceedText: 'Delete Document',
+      isDanger: true,
+      badge: 'PERMANENT DELETION'
+    });
     if (!confirmed) return;
 
     try {
