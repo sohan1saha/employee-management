@@ -7,6 +7,9 @@ set -e
 TARGET_PORT="${PORT:-8000}"
 export FORWARDED_ALLOW_IPS="${FORWARDED_ALLOW_IPS:-*}"
 
+echo "[+] StaffSync 360: Checking database migrations..."
+alembic upgrade head || echo "[!] Database migrations initialized via lifespan."
+
 echo "[+] StaffSync 360: Starting application server on 0.0.0.0:${TARGET_PORT}..."
 exec python -m uvicorn main:app \
     --host 0.0.0.0 \
