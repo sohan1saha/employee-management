@@ -66,12 +66,12 @@ flowchart TD
         K8sIngress["NGINX Ingress / Reverse Proxy (TLS Termination & Rate Limiting)"]
     end
 
-    subgraph AppCluster["FastAPI Application Pods (Horizontal Pod Autoscaling)"]
+    subgraph AppCluster["FastAPI Application Cluster (Horizontal Pod Autoscaling)"]
         FastAPI1["Apex HRMS API Pod 1"]
         FastAPI2["Apex HRMS API Pod 2"]
         FastAPIN["Apex HRMS API Pod N"]
         
-        AuthMW["Security, Tracing & HTTPS Middleware"]
+        AuthMW["Security, Tracing & Auth Middleware"]
         PromMetrics["Prometheus OpenMetrics Exporter (/metrics)"]
         JSONLogger["Structured JSON Cloud Logger"]
     end
@@ -81,8 +81,8 @@ flowchart TD
     end
 
     subgraph DBCluster["Database Storage"]
-        PGPrimary[("PostgreSQL / SQLite Primary (Writes & Transactions)")]
-        PGReplica[("PostgreSQL Read-Replica (Analytics & Read Queries)")]
+        PGPrimary[("Primary Database (Writes & Transactions)")]
+        PGReplica[("Read-Replica (Analytics & Reporting)")]
     end
 
     subgraph Observability["Cloud Observability & Monitoring"]
@@ -90,17 +90,28 @@ flowchart TD
         LogAggregator["Datadog / CloudWatch / Loki"]
     end
 
-    User -->|HTTPS :443| K8sIngress
-    K8sIngress -->|HTTP :8000 (Internal)| AuthMW
-    AuthMW --> FastAPI1 & FastAPI2 & FastAPIN
+    User -->|"HTTPS (Port 443)"| K8sIngress
+    K8sIngress -->|"HTTP (Port 8000)"| AuthMW
+    AuthMW --> FastAPI1
+    AuthMW --> FastAPI2
+    AuthMW --> FastAPIN
     
-    FastAPI1 & FastAPI2 & FastAPIN -->|Auth State / Blacklist| RedisMaster
-    FastAPI1 & FastAPI2 & FastAPIN -->|Writes / Mutations| PGPrimary
-    FastAPI1 & FastAPI2 & FastAPIN -->|Read-Only Queries| PGReplica
-    PGPrimary -.->|Streaming Replication| PGReplica
+    FastAPI1 -->|"Auth State / Blacklist"| RedisMaster
+    FastAPI1 -->|"Writes / Mutations"| PGPrimary
+    FastAPI1 -->|"Read-Only Queries"| PGReplica
+    
+    FastAPI2 --> RedisMaster
+    FastAPI2 --> PGPrimary
+    FastAPI2 --> PGReplica
 
-    PromMetrics -.->|Scrape /metrics| PrometheusServer
-    JSONLogger -.->|JSON Log Stream| LogAggregator
+    FastAPIN --> RedisMaster
+    FastAPIN --> PGPrimary
+    FastAPIN --> PGReplica
+
+    PGPrimary -.->|"Streaming Replication"| PGReplica
+
+    PromMetrics -.->|"Scrape /metrics"| PrometheusServer
+    JSONLogger -.->|"JSON Log Stream"| LogAggregator
 ```
 
 ---
