@@ -13,7 +13,7 @@
 
 **Next-Generation Cloud-Native Workforce Management, Multi-Center Scoping, Indian Statutory Payroll Engine & Real-Time Shift Intelligence**
 
-🌐 **Live Production App:** [https://web-production-767f6.up.railway.app](https://web-production-767f6.up.railway.app)
+🌐 **Live Production App:** [https://apexhrms.up.railway.app](https://apexhrms.up.railway.app)
 
 [Features](#-key-features) • [Architecture](#-enterprise-system-architecture) • [User Manual (USER_MANUAL.md)](USER_MANUAL.md) • [Operations Runbook (RUNBOOK.md)](RUNBOOK.md) • [Postman Collection](docs/Apex_HRMS_Postman_Collection.json) • [Live Demo Credentials](#-demo--evaluation-credentials) • [Quick Start](#-quick-start-guide)
 

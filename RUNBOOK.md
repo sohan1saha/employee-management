@@ -49,7 +49,7 @@ ENCRYPTION_PASSPHRASE="<Secret-GPG-Passphrase>" ./scripts/restore_db.sh /backups
 Every push to branch `main` automatically triggers an immutable Railway build:
 * **Trigger:** `git push origin main`
 * **Healthcheck Path:** `/healthz` (Liveness) and `/readyz` (Readiness).
-* **Production URL:** `https://web-production-767f6.up.railway.app`
+* **Production URL:** `https://apexhrms.up.railway.app`
 
 ### Rollback Strategy
 To roll back a faulty release immediately:
