@@ -37,19 +37,22 @@ logger = logging.getLogger("staffsync.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ensure schema tables and initial seed data exist for zero-touch cloud deployment."""
-    logger.info("Application starting: Schema is managed via Alembic migrations.")
+    logger.info("Application starting: Initializing schema and verifying seed records...")
     try:
+        from app.core.database import Base, engine, SessionLocal
+        import app.models  # Register all models
+        Base.metadata.create_all(bind=engine)
+
         from app.models.user import User
-        from app.core.database import SessionLocal
         db = SessionLocal()
         user_count = db.query(User).count()
         if user_count == 0:
-            logger.info("Empty database detected on startup. Initializing schema and seed records...")
+            logger.info("Empty database detected on startup. Seeding master records...")
             from seed_data import seed_database
             seed_database(reset=False)
         db.close()
     except Exception as e:
-        logger.warning(f"Startup database check: {e}")
+        logger.error(f"Startup database initialization error: {e}", exc_info=True)
     yield
 
 
