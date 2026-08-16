@@ -1552,14 +1552,36 @@ class AppController {
       
       // Update Summary KPIs
       const kpiDays = document.getElementById('att-kpi-days');
-      const kpiHours = document.getElementById('att-kpi-hours');
-      const kpiAvg = document.getElementById('att-kpi-avg');
       const kpiPunct = document.getElementById('att-kpi-punctuality');
+      const kpiPunctSub = document.getElementById('att-kpi-punctuality-sub');
 
       if (kpiDays) kpiDays.innerText = `${summary.total_days_present} Days`;
       if (kpiHours) kpiHours.innerText = `${summary.total_working_hours} hrs`;
       if (kpiAvg) kpiAvg.innerText = `${summary.average_daily_hours} hrs`;
-      if (kpiPunct) kpiPunct.innerText = `${summary.on_time_rate_percent}%`;
+
+      if (kpiPunct) {
+        if (summary.total_days_present === 0) {
+          kpiPunct.innerText = `0.0%`;
+          if (kpiPunctSub) {
+            kpiPunctSub.innerText = 'No shifts logged yet';
+            kpiPunctSub.style.color = 'var(--text-muted)';
+          }
+        } else {
+          kpiPunct.innerText = `${summary.on_time_rate_percent}%`;
+          if (kpiPunctSub) {
+            if (summary.on_time_rate_percent >= 90) {
+              kpiPunctSub.innerText = 'Excellent punctuality';
+              kpiPunctSub.style.color = '#34d399';
+            } else if (summary.on_time_rate_percent >= 75) {
+              kpiPunctSub.innerText = 'Good punctuality';
+              kpiPunctSub.style.color = '#60a5fa';
+            } else {
+              kpiPunctSub.innerText = 'Needs improvement';
+              kpiPunctSub.style.color = '#f59e0b';
+            }
+          }
+        }
+      }
 
       // Update Employee Widget Card state
       this.updateAttendanceWidgetState(summary);

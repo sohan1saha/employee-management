@@ -152,7 +152,7 @@ def get_attendance_summary(
     total_hours = sum(float(r.total_hours) for r in records)
     avg_hours = round(total_hours / total_days, 1) if total_days > 0 else 0.0
     on_time_count = len([r for r in records if r.status in ["PRESENT", "OVERTIME"]])
-    on_time_rate = round((on_time_count / total_days) * 100.0, 1) if total_days > 0 else 100.0
+    on_time_rate = round((on_time_count / total_days) * 100.0, 1) if total_days > 0 else 0.0
 
     today = date.today()
     # Check active un-clocked-out record first
