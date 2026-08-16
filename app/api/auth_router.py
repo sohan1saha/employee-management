@@ -18,7 +18,7 @@ from app.core.security import (
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user_schema import UserLogin, TokenResponse, PasswordChangeRequest, RefreshTokenRequest
-from app.api.deps import get_current_user, get_request_id
+from app.api.deps import get_current_user, get_request_id, get_client_ip
 from app.services.audit_service import record_audit
 from app.services.cache_service import cache
 
@@ -38,7 +38,7 @@ def login(
     """
     now = datetime.now(timezone.utc)
     req_id = get_request_id(request)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
     user_agent = request.headers.get("User-Agent", "Unknown")
 
     user = db.query(User).filter(User.employee_id == user_credentials.employee_id).first()
@@ -255,7 +255,7 @@ def change_password(
     Change user password with strict policy validation and session invalidation.
     """
     req_id = get_request_id(request)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
     user_agent = request.headers.get("User-Agent", "Unknown")
 
     # 1. Verify old password

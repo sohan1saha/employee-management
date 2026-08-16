@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, get_request_id
+from app.api.deps import get_current_user, get_request_id, get_client_ip, validate_resource_access
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.document import EmployeeDocument
@@ -27,6 +27,7 @@ os.makedirs(STORAGE_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".docx", ".doc", ".txt"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+INTERMEDIATE_DANGEROUS = {"php", "phtml", "py", "sh", "bash", "exe", "bat", "cmd", "js", "vbs", "ps1", "jsp", "asp", "aspx"}
 
 
 @router.post("/upload", response_model=DocumentResponse)
@@ -39,35 +40,45 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Securely upload an employee document or certificate."""
-    # Determine target employee ID
-    if target_employee_id and current_user.role in ["ADMIN", "MANAGER"]:
-        emp_id = target_employee_id
-    else:
-        emp_id = current_user.employee_id
+    """Securely upload an employee document or certificate with strict path sanitization & MIME checking."""
+    # Determine target employee ID and validate authorization boundary
+    emp_id = target_employee_id if (target_employee_id and current_user.role in ["ADMIN", "MANAGER"]) else current_user.employee_id
+    emp = validate_resource_access(db, current_user, emp_id)
 
-    emp = db.query(Employee).filter(Employee.eid == emp_id).first()
-    if not emp:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Employee #{emp_id} not found."
-        )
+    # Sanitize raw filename to prevent directory traversal attacks
+    raw_name = os.path.basename(file.filename or "document.pdf")
+    name_parts = raw_name.lower().split(".")
+
+    # Reject dangerous double extensions (e.g. payload.php.pdf)
+    if len(name_parts) > 2:
+        for part in name_parts[1:-1]:
+            if part in INTERMEDIATE_DANGEROUS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Security policy violation: nested script extension '.{part}' is strictly prohibited."
+                )
 
     # Validate file extension
-    _, ext = os.path.splitext(file.filename)
+    _, ext = os.path.splitext(raw_name)
     ext = ext.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file format '{ext}'. Allowed formats: PDF, PNG, JPG, JPEG, DOCX."
+            detail=f"Invalid file format '{ext}'. Allowed formats: PDF, PNG, JPG, JPEG, DOCX, TXT."
         )
 
-    # Create target directory
-    emp_storage = os.path.join(STORAGE_DIR, str(emp_id))
+    # Path traversal containment verification
+    emp_storage = os.path.abspath(os.path.join(STORAGE_DIR, str(emp_id)))
     os.makedirs(emp_storage, exist_ok=True)
 
-    safe_filename = f"{uuid.uuid4().hex[:12]}_{file.filename}"
-    file_path = os.path.join(emp_storage, safe_filename)
+    safe_filename = f"{uuid.uuid4().hex[:12]}_{raw_name}"
+    file_path = os.path.abspath(os.path.join(emp_storage, safe_filename))
+
+    if not file_path.startswith(STORAGE_DIR):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Security policy violation: Path traversal sequence detected."
+        )
 
     # Read and validate size
     content = await file.read()
@@ -118,7 +129,7 @@ async def upload_document(
         employee_id=emp_id,
         title=title.strip(),
         document_type=document_type.upper(),
-        file_name=file.filename,
+        file_name=raw_name,
         file_size=file_size,
         mime_type=file.content_type or "application/octet-stream",
         file_path=file_path,
@@ -128,6 +139,7 @@ async def upload_document(
     db.commit()
     db.refresh(doc)
 
+    client_ip = get_client_ip(request)
     record_audit(
         db=db,
         action="DOCUMENT_UPLOADED",
@@ -135,8 +147,8 @@ async def upload_document(
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
         role=current_user.role,
-        new_value=f"File: {file.filename} ({file_size / 1024:.1f} KB) | Type: {document_type}",
-        client_ip=request.client.host if request.client else "127.0.0.1",
+        new_value=f"File: {raw_name} ({file_size / 1024:.1f} KB) | Type: {document_type}",
+        client_ip=client_ip,
         request_id=get_request_id(request)
     )
 
@@ -226,6 +238,7 @@ def delete_document(
     db.delete(doc)
     db.commit()
 
+    client_ip = get_client_ip(request)
     record_audit(
         db=db,
         action="DOCUMENT_DELETED",
@@ -234,7 +247,7 @@ def delete_document(
         username=f"#{current_user.employee_id}",
         role=current_user.role,
         new_value=f"Deleted document ID #{document_id}",
-        client_ip=request.client.host if request.client else "127.0.0.1",
+        client_ip=client_ip,
         request_id=get_request_id(request)
     )
 

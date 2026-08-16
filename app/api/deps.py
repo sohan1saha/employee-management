@@ -19,6 +19,31 @@ def get_request_id(request: Request) -> str:
     return req_id
 
 
+def get_client_ip(request: Request) -> str:
+    """
+    Accurately extracts client IP address, respecting reverse proxies
+    (Railway, Nginx, Cloudflare, AWS ALB) via X-Forwarded-For, X-Real-IP, CF-Connecting-IP.
+    """
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+
+    xff = request.headers.get("X-Forwarded-For")
+    if xff and xff.strip():
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if parts:
+            return parts[0]
+
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip and x_real_ip.strip():
+        return x_real_ip.strip()
+
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "127.0.0.1"
+
+
 def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme),

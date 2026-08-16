@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, get_request_id
+from app.api.deps import get_current_user, get_request_id, get_client_ip
 from app.models.user import User
 from app.models.employee import Employee
 from app.models.attendance import AttendanceRecord
@@ -79,7 +79,7 @@ def clock_in(
     """Record employee daily shift clock-in with punctuality and device logging."""
     today = date.today()
     now_utc = datetime.now(timezone.utc)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
     device_summary = parse_device_info(user_agent, payload.device_info)
 
@@ -152,7 +152,7 @@ def start_break(
 ):
     """Start an active employee break during an ongoing shift."""
     now_utc = datetime.now(timezone.utc)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     record = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == current_user.employee_id,
@@ -202,7 +202,7 @@ def end_break(
 ):
     """Resume active shift and accumulate break duration."""
     now_utc = datetime.now(timezone.utc)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     record = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == current_user.employee_id,
@@ -255,7 +255,7 @@ def clock_out(
 ):
     """Record employee clock-out, deduct breaks, and compute net working & overtime hours."""
     now_utc = datetime.now(timezone.utc)
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     record = db.query(AttendanceRecord).filter(
         AttendanceRecord.employee_id == current_user.employee_id,

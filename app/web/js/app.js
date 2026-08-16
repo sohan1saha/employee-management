@@ -107,7 +107,10 @@ class AppController {
       monthPicker.value = monthStr;
     }
 
-    this.switchView('dashboard');
+    const currentHash = window.location.hash.replace('#', '');
+    const validViews = ['dashboard', 'attendance', 'employees', 'payroll', 'leaves', 'performance', 'documents', 'audit'];
+    const initialView = validViews.includes(currentHash) ? currentHash : 'dashboard';
+    this.switchView(initialView, true);
     this.loadCentersDropdowns();
     this.loadNotifications();
   }
@@ -243,6 +246,15 @@ class AppController {
     window.addEventListener('keydown', handleGlobalKeydown, true);
     document.addEventListener('keydown', handleGlobalKeydown, true);
 
+    // URL Hash Navigation Listener
+    window.addEventListener('hashchange', () => {
+      const hash = window.location.hash.replace('#', '');
+      const validViews = ['dashboard', 'attendance', 'employees', 'payroll', 'leaves', 'performance', 'documents', 'audit'];
+      if (validViews.includes(hash) && this.currentView !== hash) {
+        this.switchView(hash, false);
+      }
+    });
+
     // Global unauthorized handler
     window.addEventListener('auth:unauthorized', () => {
       this.showLoginOverlay();
@@ -253,8 +265,12 @@ class AppController {
   // =========================================================================
   // Navigation & View Controller
   // =========================================================================
-  switchView(viewName) {
+  switchView(viewName, updateHash = true) {
     this.currentView = viewName;
+    if (updateHash && window.location.hash !== `#${viewName}`) {
+      history.pushState(null, '', `#${viewName}`);
+    }
+
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => {
       el.classList.toggle('active', el.getAttribute('data-view') === viewName);
     });
@@ -300,11 +316,13 @@ class AppController {
         api.user?.role === 'EMPLOYEE' ? 'My Document Vault' : 'Document Vault & Compliance',
         api.user?.role === 'EMPLOYEE' ? 'Upload and manage your contracts, ID proofs, and certifications' : 'Employee compliance file archive, ID proofs, and contracts'
       ],
-      audit: ['Audit Vault', 'Immutable system activity and modification logs']
+      audit: ['Audit Trail & Compliance', 'Append-only activity logs with IP and correlation request ID tracing']
     };
 
-    document.getElementById('page-title').innerText = titles[viewName]?.[0] || 'Dashboard';
-    document.getElementById('page-subtitle').innerText = titles[viewName]?.[1] || '';
+    const titleEl = document.getElementById('page-title');
+    const subtitleEl = document.getElementById('page-subtitle');
+    if (titleEl) titleEl.innerText = titles[viewName]?.[0] || 'Dashboard';
+    if (subtitleEl) subtitleEl.innerText = titles[viewName]?.[1] || '';
 
     this.closeMobileSidebar();
     this.refreshCurrentView();
@@ -962,16 +980,24 @@ class AppController {
   // 2. Employees View
   // =========================================================================
   async loadEmployees() {
-    const search = document.getElementById('emp-search').value.trim();
-    const center = document.getElementById('emp-center-filter').value;
-    const status = document.getElementById('emp-status-filter').value;
+    const tbody = document.getElementById('employees-table-body');
+    if (tbody) tbody.innerHTML = this.renderSkeletonRows(8, 5);
+
+    const search = document.getElementById('emp-search')?.value.trim() || '';
+    const center = document.getElementById('emp-center-filter')?.value || '';
+    const status = document.getElementById('emp-status-filter')?.value || '';
 
     try {
       const employees = await api.getEmployees({ search, center, status });
-      const tbody = document.getElementById('employees-table-body');
+      if (!tbody) return;
       
       if (employees.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No employees matching criteria.</td></tr>`;
+        tbody.innerHTML = this.renderEmptyState(
+          '👥',
+          'No Employees Found',
+          search || center ? 'No staff records matched the specified search and filter criteria.' : 'No active employee records exist in this branch directory.',
+          api.user?.role === 'ADMIN' ? '<button class="btn btn-primary btn-sm" onclick="app.openAddEmployeeModal()" style="margin-top: 10px;">+ Add New Employee</button>' : ''
+        );
         return;
       }
 
@@ -997,6 +1023,7 @@ class AppController {
       `;
       }).join('');
     } catch (err) {
+      if (tbody) tbody.innerHTML = this.renderErrorState('Failed to retrieve employee roster from server.', 'app.loadEmployees()');
       this.showToast('Failed to load employees', 'error');
     }
   }
@@ -1155,15 +1182,23 @@ class AppController {
   // 3. Payroll Hub View
   // =========================================================================
   async loadPayroll() {
-    const month = document.getElementById('payroll-month-select').value;
-    const center = document.getElementById('payroll-center-filter').value;
+    const tbody = document.getElementById('payroll-table-body');
+    if (tbody) tbody.innerHTML = this.renderSkeletonRows(10, 5);
+
+    const month = document.getElementById('payroll-month-select')?.value || '';
+    const center = document.getElementById('payroll-center-filter')?.value || '';
 
     try {
       const records = await api.getPayroll({ month_year: month, center });
-      const tbody = document.getElementById('payroll-table-body');
+      if (!tbody) return;
 
       if (records.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">No payroll records for ${month || 'selected criteria'}. Click "Process Monthly Payroll" to generate.</td></tr>`;
+        tbody.innerHTML = this.renderEmptyState(
+          '💰',
+          'No Payroll Records Found',
+          `No generated payroll batch found for cycle ${month || 'current month'}.`,
+          api.user?.role !== 'EMPLOYEE' ? `<button class="btn btn-primary btn-sm" onclick="app.triggerPayrollBatch()" style="margin-top: 10px;">⚡ Run Payroll Batch</button>` : ''
+        );
         return;
       }
 
@@ -1186,6 +1221,7 @@ class AppController {
         </tr>
       `).join('');
     } catch (err) {
+      if (tbody) tbody.innerHTML = this.renderErrorState('Failed to retrieve payroll records from server.', 'app.loadPayroll()');
       this.showToast('Failed to load payroll', 'error');
     }
   }
@@ -1229,7 +1265,10 @@ class AppController {
   // 4. Leaves View
   // =========================================================================
   async loadLeaves() {
-    const status_filter = document.getElementById('leave-status-filter').value;
+    const tbody = document.getElementById('leaves-table-body');
+    if (tbody) tbody.innerHTML = this.renderSkeletonRows(8, 5);
+
+    const status_filter = document.getElementById('leave-status-filter')?.value || '';
     
     // Dynamically configure action buttons for role
     const btnMyLeave = document.getElementById('btn-apply-my-leave');
@@ -1256,10 +1295,15 @@ class AppController {
 
     try {
       const leaves = await api.getLeaves({ status_filter });
-      const tbody = document.getElementById('leaves-table-body');
+      if (!tbody) return;
 
       if (leaves.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No leave requests found.</td></tr>`;
+        tbody.innerHTML = this.renderEmptyState(
+          '📅',
+          'No Time-Off Requests',
+          status_filter ? `No leave requests matching status '${status_filter}'.` : 'No submitted PTO applications exist in this period.',
+          `<button class="btn btn-primary btn-sm" onclick="app.openApplyLeaveModal()" style="margin-top: 10px;">+ Request Time Off</button>`
+        );
         return;
       }
 
@@ -1310,6 +1354,7 @@ class AppController {
         `;
       }).join('');
     } catch (err) {
+      if (tbody) tbody.innerHTML = this.renderErrorState('Failed to retrieve leave requests from server.', 'app.loadLeaves()');
       this.showToast('Failed to load leaves', 'error');
     }
   }
@@ -1523,12 +1568,19 @@ class AppController {
   // 7. Audit Vault View
   // =========================================================================
   async loadAuditLogs() {
+    const tbody = document.getElementById('audit-table-body');
+    if (tbody) tbody.innerHTML = this.renderSkeletonRows(7, 6);
+
     try {
       const logs = await api.getAuditLogs({ limit: 100 });
-      const tbody = document.getElementById('audit-table-body');
+      if (!tbody) return;
 
       if (logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No audit logs recorded yet.</td></tr>`;
+        tbody.innerHTML = this.renderEmptyState(
+          '🛡️',
+          'Audit Log is Empty',
+          'Append-only system security logs will appear as operations are executed.'
+        );
         return;
       }
 
@@ -1544,6 +1596,7 @@ class AppController {
         </tr>
       `).join('');
     } catch (err) {
+      if (tbody) tbody.innerHTML = this.renderErrorState('Failed to retrieve system audit records from server.', 'app.loadAuditLogs()');
       this.showToast('Failed to load audit logs', 'error');
     }
   }
@@ -1962,14 +2015,20 @@ class AppController {
   }
 
   async loadAttendanceHistory() {
+    const tbody = document.getElementById('attendance-table-body');
+    if (tbody) tbody.innerHTML = this.renderSkeletonRows(8, 5);
+
     try {
       const centerFilter = document.getElementById('att-center-filter')?.value || 'ALL';
       const history = await api.getAttendanceHistory({ center: centerFilter, page_size: 50 });
-      const tbody = document.getElementById('attendance-table-body');
       if (!tbody) return;
 
       if (history.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:30px;">No attendance records found.</td></tr>`;
+        tbody.innerHTML = this.renderEmptyState(
+          '⏱️',
+          'No Attendance Records Found',
+          'No check-in or shift sessions logged for the selected center filter.'
+        );
         return;
       }
 
@@ -1995,11 +2054,12 @@ class AppController {
               ${breakM > 0 ? `<small style="color:var(--text-muted); display:block; font-size:0.7rem;">(${breakM}m break)</small>` : ''}
             </td>
             <td>${statusBadge}</td>
-            <td><span style="font-size:0.75rem; color:var(--text-muted);">${rec.device_info || rec.ip_address || '—'}</span></td>
+            <td><small style="color:var(--text-muted); font-size:0.72rem;">${rec.device_info || 'Web'}</small></td>
           </tr>
         `;
       }).join('');
     } catch (err) {
+      if (tbody) tbody.innerHTML = this.renderErrorState('Failed to retrieve attendance logs from server.', 'app.loadAttendanceHistory()');
       console.warn('Attendance history error:', err);
     }
   }
@@ -2036,16 +2096,25 @@ class AppController {
   // 8. Performance Reviews & Appraisals
   // =========================================================================
   async loadPerformanceReviews() {
+    const container = document.getElementById('performance-reviews-container');
+    if (container) {
+      container.innerHTML = `
+        <div class="review-card skeleton-shimmer" style="height: 180px; margin-bottom: 16px;"></div>
+        <div class="review-card skeleton-shimmer" style="height: 180px;"></div>
+      `;
+    }
+
     try {
       const reviews = await api.getPerformanceReviews();
-      const container = document.getElementById('performance-reviews-container');
       if (!container) return;
 
       if (reviews.length === 0) {
         container.innerHTML = `
-          <div class="card" style="text-align:center; padding:40px; color:var(--text-muted);">
-            <h3>No Performance Appraisals Published Yet</h3>
-            <p style="font-size:0.85rem; margin-top:6px;">Performance appraisals conducted by managers will appear here.</p>
+          <div class="empty-state-box">
+            <div class="empty-state-icon">⭐</div>
+            <div class="empty-state-title">No Performance Appraisals Published Yet</div>
+            <div class="empty-state-desc">Quarterly performance appraisals authored by managers will appear here.</div>
+            ${api.user?.role !== 'EMPLOYEE' ? '<button class="btn btn-primary btn-sm" onclick="app.openAddReviewModal()" style="margin-top: 10px;">+ Author Review</button>' : ''}
           </div>
         `;
         return;
@@ -2108,6 +2177,16 @@ class AppController {
         `;
       }).join('');
     } catch (err) {
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state-box" style="border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.04);">
+            <div class="empty-state-icon">⚠️</div>
+            <div class="empty-state-title" style="color: #f87171;">Connection Error</div>
+            <div class="empty-state-desc">Failed to load performance appraisals from server.</div>
+            <button class="btn btn-secondary btn-sm" onclick="app.loadPerformanceReviews()" style="margin-top: 10px;">🔄 Retry Request</button>
+          </div>
+        `;
+      }
       console.warn('Performance reviews error:', err);
     }
   }
@@ -2175,6 +2254,15 @@ class AppController {
   // 9. Document Vault & File Management
   // =========================================================================
   async loadDocuments() {
+    const grid = document.getElementById('documents-grid');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="doc-card skeleton-shimmer" style="height: 160px;"></div>
+        <div class="doc-card skeleton-shimmer" style="height: 160px;"></div>
+        <div class="doc-card skeleton-shimmer" style="height: 160px;"></div>
+      `;
+    }
+
     try {
       const isManagerOrAdmin = api.user?.role !== 'EMPLOYEE';
       const selectorWrap = document.getElementById('doc-emp-selector-wrap');
@@ -2199,15 +2287,17 @@ class AppController {
       if (!selectedEid) return;
 
       const docs = await api.getEmployeeDocuments(selectedEid);
-      const grid = document.getElementById('documents-grid');
       if (!grid) return;
 
       if (docs.length === 0) {
         grid.innerHTML = `
-          <div class="card" style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
-            <h3>Document Vault is Empty</h3>
-            <p style="font-size:0.85rem; margin-top:6px;">Upload ID proof, degree certificates, and signed contracts for permanent compliance storage.</p>
-            <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()" style="margin-top:14px;">+ Upload First File</button>
+          <div style="grid-column: 1 / -1;">
+            <div class="empty-state-box">
+              <div class="empty-state-icon">📁</div>
+              <div class="empty-state-title">Document Vault is Empty</div>
+              <div class="empty-state-desc">Upload ID proofs, degree certificates, and signed agreements for permanent compliance archiving.</div>
+              <button class="btn btn-primary btn-sm" onclick="app.openUploadDocModal()" style="margin-top: 10px;">+ Upload First File</button>
+            </div>
           </div>
         `;
         return;
@@ -2251,6 +2341,18 @@ class AppController {
         `;
       }).join('');
     } catch (err) {
+      if (grid) {
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1;">
+            <div class="empty-state-box" style="border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.04);">
+              <div class="empty-state-icon">⚠️</div>
+              <div class="empty-state-title" style="color: #f87171;">Connection Error</div>
+              <div class="empty-state-desc">Failed to load archived documents from server.</div>
+              <button class="btn btn-secondary btn-sm" onclick="app.loadDocuments()" style="margin-top: 10px;">🔄 Retry Request</button>
+            </div>
+          </div>
+        `;
+      }
       console.warn('Load documents error:', err);
     }
   }
@@ -2584,6 +2686,23 @@ class AppController {
             <div class="empty-state-title">${title}</div>
             <div class="empty-state-desc">${desc}</div>
             ${actionBtnHtml}
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  renderErrorState(message = 'Failed to load records from server.', retryFnCall = 'app.refreshCurrentView()') {
+    return `
+      <tr>
+        <td colspan="100" style="padding: 0; border: none;">
+          <div class="empty-state-box" style="border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.04);">
+            <div class="empty-state-icon" style="font-size: 2.2rem;">⚠️</div>
+            <div class="empty-state-title" style="color: #f87171;">Connection Error</div>
+            <div class="empty-state-desc">${message}</div>
+            <button class="btn btn-secondary btn-sm" onclick="${retryFnCall}" style="margin-top: 12px;">
+              <span>🔄</span> Retry Request
+            </button>
           </div>
         </td>
       </tr>

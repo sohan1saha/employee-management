@@ -1530,6 +1530,16 @@ body {
     width: calc(100vw - 24px);
     right: -10px;
   }
+
+  .command-palette-overlay {
+    padding-top: 4vh;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .command-palette-card {
+    max-height: 85vh;
+  }
 }
 
 /* Small Smartphone Displays (<= 480px) */

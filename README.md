@@ -7,7 +7,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7%2B-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-31%20Suites%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-36%20Suites%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)
 ![Security](https://img.shields.io/badge/Security-Bandit%20SAST%20Clean-success?style=for-the-badge&logo=securityscorecard&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
