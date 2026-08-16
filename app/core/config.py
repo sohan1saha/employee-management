@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "StaffSync 360 - Enterprise HRMS & Payroll"
+    PROJECT_NAME: str = "Apex HRMS — Enterprise Workforce & Payroll"
     API_V1_STR: str = "/api"
     ENVIRONMENT: str = "development"  # "development", "staging", "production"
     DEBUG: bool = True

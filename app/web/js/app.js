@@ -1,5 +1,5 @@
 /**
- * StaffSync 360 - Main Dashboard & UI Controller
+ * Apex HRMS - Enterprise Main Dashboard & UI Controller
  */
 
 class AppController {
@@ -900,7 +900,7 @@ class AppController {
     const pf = basic * 0.12;
     const net = document.getElementById('calc-res-net').innerText;
 
-    const text = `StaffSync 360 - Compensation Breakdown:\n` +
+    const text = `Apex HRMS - Compensation Breakdown:\n` +
       `Gross Salary: ₹${gross.toLocaleString('en-IN')}/mo\n` +
       `Basic Pay (50%): ₹${basic.toLocaleString('en-IN')}\n` +
       `HRA (20%): ₹${hra.toLocaleString('en-IN')}\n` +
@@ -934,7 +934,7 @@ class AppController {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `StaffSync_Workforce_Roster_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `ApexHRMS_Workforce_Roster_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * StaffSync 360 - Enterprise API Client Layer
+ * Apex HRMS - Enterprise API Client Layer
  * ==============================================================================
  * Handles Bearer token headers, HttpOnly cookie credentials, and automatic
  * silent JWT access token refresh on 401 Unauthorized responses.

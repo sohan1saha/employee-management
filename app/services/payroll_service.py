@@ -262,7 +262,7 @@ def generate_payslip_pdf(payroll: PayrollRecord) -> io.BytesIO:
     elements = []
 
     # Header
-    elements.append(Paragraph("STAFFSYNC 360 ENTERPRISE", title_style))
+    elements.append(Paragraph("APEX HRMS ENTERPRISE", title_style))
     elements.append(Paragraph(f"Official Payslip Statement — Cycle: <b>{payroll.month_year}</b>", subtitle_style))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#6366F1"), spaceBefore=0, spaceAfter=15))
 
@@ -387,7 +387,7 @@ def generate_payslip_pdf(payroll: PayrollRecord) -> io.BytesIO:
         alignment=TA_CENTER
     )
     elements.append(Paragraph(
-        f"This document is an electronically verified payslip generated automatically by StaffSync 360 on {payroll.generated_at.strftime('%d-%b-%Y %H:%M:%S UTC') if payroll.generated_at else 'N/A'}. No physical signature required.",
+        f"This document is an electronically verified payslip generated automatically by Apex HRMS on {payroll.generated_at.strftime('%d-%b-%Y %H:%M:%S UTC') if payroll.generated_at else 'N/A'}. No physical signature required.",
         footer_style
     ))
 
