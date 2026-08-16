@@ -7,14 +7,15 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7%2B-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-26%20Suites%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-31%20Suites%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Bandit%20SAST%20Clean-success?style=for-the-badge&logo=securityscorecard&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
 **Next-Generation Cloud-Native Workforce Management, Multi-Center Scoping, Indian Statutory Payroll Engine & Real-Time Shift Intelligence**
 
 🌐 **Live Production App:** [https://web-production-767f6.up.railway.app](https://web-production-767f6.up.railway.app)
 
-[Features](#-key-features) • [Architecture](#-enterprise-system-architecture) • [Live Demo Credentials](#-demo--evaluation-credentials) • [API Docs](#-api-endpoint-documentation) • [Quick Start](#-quick-start-guide) • [Testing](#-automated-testing--quality-gates)
+[Features](#-key-features) • [Architecture](#-enterprise-system-architecture) • [User Manual (USER_MANUAL.md)](USER_MANUAL.md) • [Operations Runbook (RUNBOOK.md)](RUNBOOK.md) • [Postman Collection](docs/Apex_HRMS_Postman_Collection.json) • [Live Demo Credentials](#-demo--evaluation-credentials) • [Quick Start](#-quick-start-guide)
 
 </div>
 

@@ -46,6 +46,7 @@ coverage.xml
 staffsync.db
 apex_hrms.db
 uploads/
+storage/
 backups/
 *.log
 

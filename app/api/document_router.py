@@ -78,6 +78,38 @@ async def upload_document(
             detail="File size exceeds maximum allowed threshold of 10MB."
         )
 
+    # Security: Magic Byte Header Inspection to prevent disguised malicious binaries / polyglots
+    DANGEROUS_SIGNATURES = [
+        b"MZ",            # DOS / Windows Executable / DLL
+        b"\x7fELF",       # Linux ELF Binary
+        b"\xca\xfe\xba\xbe", # Java Class Bytecode / Mach-O Fat
+        b"#!/",           # Shell script execution header
+        b"<?php",         # PHP Script execution
+    ]
+    for sig in DANGEROUS_SIGNATURES:
+        if content.startswith(sig):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy violation: executable or script binaries are strictly prohibited."
+            )
+
+    # Format-specific signature verification
+    if ext == ".pdf" and not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PDF file: Missing standard PDF header signature."
+        )
+    elif ext == ".png" and not content.startswith(b"\x89PNG"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PNG image: Missing standard PNG header signature."
+        )
+    elif ext in [".jpg", ".jpeg"] and not content.startswith(b"\xff\xd8"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JPEG image: Missing standard JPEG header signature."
+        )
+
     # Write file to disk
     with open(file_path, "wb") as f:
         f.write(content)

@@ -229,6 +229,17 @@ class AppController {
       });
     });
 
+    // Global Spotlight Command Palette (Ctrl+K / Cmd+K)
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        this.toggleCommandPalette();
+      } else if (e.key === 'Escape') {
+        this.closeCommandPalette();
+        this.closeModals();
+      }
+    });
+
     // Global unauthorized handler
     window.addEventListener('auth:unauthorized', () => {
       this.showLoginOverlay();
@@ -2387,6 +2398,196 @@ class AppController {
   }
 
   // =========================================================================
+  // Spotlight Command Palette (Ctrl+K)
+  // =========================================================================
+  toggleCommandPalette() {
+    const modal = document.getElementById('modal-command-palette');
+    if (!modal) return;
+    if (modal.classList.contains('active')) {
+      this.closeCommandPalette();
+    } else {
+      this.openCommandPalette();
+    }
+  }
+
+  openCommandPalette() {
+    const modal = document.getElementById('modal-command-palette');
+    const input = document.getElementById('command-palette-input');
+    if (!modal || !input) return;
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+    input.value = '';
+    input.focus();
+    this.filterCommandPalette('');
+  }
+
+  closeCommandPalette() {
+    const modal = document.getElementById('modal-command-palette');
+    if (!modal) return;
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+
+  handleCommandPaletteBackdrop(e) {
+    if (e.target.id === 'modal-command-palette') {
+      this.closeCommandPalette();
+    }
+  }
+
+  filterCommandPalette(query) {
+    const resultsContainer = document.getElementById('command-palette-results');
+    if (!resultsContainer) return;
+    const q = query.trim().toLowerCase();
+    const role = api.user?.role || 'EMPLOYEE';
+
+    // Base navigation commands
+    const navCommands = [
+      { icon: '📊', title: role === 'EMPLOYEE' ? 'My Workspace' : 'Executive Dashboard', subtitle: 'View workforce overview and KPIs', action: 'navigate', param: 'dashboard', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '⏱️', title: 'Daily Attendance & Shifts', subtitle: 'Clock in, check break timers, and view roster', action: 'navigate', param: 'attendance', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '👥', title: 'Employee Directory', subtitle: 'Browse roster and management profiles', action: 'navigate', param: 'employees', roles: ['ADMIN', 'MANAGER'] },
+      { icon: '💰', title: role === 'EMPLOYEE' ? 'My Payslips' : 'Payroll Operations Hub', subtitle: 'Run batch payroll calculations & download PDF payslips', action: 'navigate', param: 'payroll', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '📅', title: 'Leaves & PTO Portal', subtitle: 'Submit time-off requests and approvals', action: 'navigate', param: 'leaves', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '⭐', title: '360 Performance Appraisals', subtitle: 'Author reviews and employee acknowledgements', action: 'navigate', param: 'performance', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '📁', title: 'Document Vault & Compliance', subtitle: 'Upload and manage contracts & certificates', action: 'navigate', param: 'documents', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '📈', title: 'Workforce Analytics', subtitle: 'Headcount distribution and salary charts', action: 'navigate', param: 'analytics', roles: ['ADMIN', 'MANAGER'] },
+      { icon: '🛡️', title: 'Security Audit Vault', subtitle: 'Inspect immutable system event logs', action: 'navigate', param: 'audit', roles: ['ADMIN', 'MANAGER'] },
+    ];
+
+    // Quick Actions
+    const quickActions = [
+      { icon: '▶️', title: 'Clock In for Today', subtitle: 'Record shift start timestamp and location', action: 'clockin', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '☕', title: 'Take / Resume Break', subtitle: 'Toggle active rest break timer', action: 'break', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '⏹️', title: 'Clock Out & Finalize Shift', subtitle: 'Review active hours and close daily record', action: 'clockout', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '📝', title: 'Apply for Leave / PTO', subtitle: 'Submit a new time-off request', action: 'modal_leave', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '🧮', title: 'Open Salary & CTC Calculator', subtitle: 'Simulate gross, tax, and take-home pay', action: 'modal_calc', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '🔒', title: 'Change Security Password', subtitle: 'Update account credentials', action: 'modal_pwd', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { icon: '🚪', title: 'Sign Out of Apex HRMS', subtitle: 'End current secure session', action: 'logout', roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] }
+    ];
+
+    const filteredNav = navCommands.filter(c => c.roles.includes(role) && (c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q)));
+    const filteredActions = quickActions.filter(c => c.roles.includes(role) && (c.title.toLowerCase().includes(q) || c.subtitle.toLowerCase().includes(q)));
+
+    let html = '';
+
+    if (filteredNav.length > 0) {
+      html += `<div class="command-section-title">Navigation & Modules</div>`;
+      html += filteredNav.map((c, i) => `
+        <div class="command-item ${i === 0 && !q ? 'focused' : ''}" onclick="app.executeCommand('${c.action}', '${c.param || ''}')">
+          <div class="command-item-icon">${c.icon}</div>
+          <div class="command-item-content">
+            <div class="command-item-title">${c.title}</div>
+            <div class="command-item-subtitle">${c.subtitle}</div>
+          </div>
+          <div class="command-item-key">Jump</div>
+        </div>
+      `).join('');
+    }
+
+    if (filteredActions.length > 0) {
+      html += `<div class="command-section-title" style="margin-top: 10px;">Quick Shortcuts</div>`;
+      html += filteredActions.map(c => `
+        <div class="command-item" onclick="app.executeCommand('${c.action}', '${c.param || ''}')">
+          <div class="command-item-icon">${c.icon}</div>
+          <div class="command-item-content">
+            <div class="command-item-title">${c.title}</div>
+            <div class="command-item-subtitle">${c.subtitle}</div>
+          </div>
+          <div class="command-item-key">Action</div>
+        </div>
+      `).join('');
+    }
+
+    if (!html) {
+      html = `
+        <div class="empty-state-box" style="padding: 24px 10px;">
+          <div class="empty-state-icon" style="font-size: 2rem;">🔍</div>
+          <div class="empty-state-title">No matching commands</div>
+          <div class="empty-state-desc">Try searching for "attendance", "leave", "payroll", or "password".</div>
+        </div>
+      `;
+    }
+
+    resultsContainer.innerHTML = html;
+  }
+
+  handleCommandPaletteKeydown(e) {
+    const items = document.querySelectorAll('.command-item');
+    let currentIndex = -1;
+    items.forEach((el, i) => {
+      if (el.classList.contains('focused')) currentIndex = i;
+    });
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (items.length === 0) return;
+      if (currentIndex >= 0) items[currentIndex].classList.remove('focused');
+      const nextIndex = (currentIndex + 1) % items.length;
+      items[nextIndex].classList.add('focused');
+      items[nextIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length === 0) return;
+      if (currentIndex >= 0) items[currentIndex].classList.remove('focused');
+      const prevIndex = (currentIndex - 1 + items.length) % items.length;
+      items[prevIndex].classList.add('focused');
+      items[prevIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const focused = document.querySelector('.command-item.focused') || items[0];
+      if (focused) focused.click();
+    }
+  }
+
+  executeCommand(action, param) {
+    this.closeCommandPalette();
+    if (action === 'navigate') {
+      this.switchView(param);
+    } else if (action === 'clockin') {
+      this.handleClockIn();
+    } else if (action === 'break') {
+      this.handleToggleBreak();
+    } else if (action === 'clockout') {
+      this.handleClockOut();
+    } else if (action === 'modal_leave') {
+      this.openApplyLeaveModal();
+    } else if (action === 'modal_calc') {
+      this.openSalaryCalculatorModal();
+    } else if (action === 'modal_pwd') {
+      this.openChangePasswordModal();
+    } else if (action === 'logout') {
+      document.getElementById('btn-logout').click();
+    }
+  }
+
+  // =========================================================================
+  // UI Polish: Skeleton Loaders & Rich Empty States
+  // =========================================================================
+  renderSkeletonRows(colCount, rowCount = 5) {
+    return Array.from({ length: rowCount }).map(() => `
+      <tr>
+        ${Array.from({ length: colCount }).map(() => `
+          <td><div class="skeleton-shimmer skeleton-text"></div></td>
+        `).join('')}
+      </tr>
+    `).join('');
+  }
+
+  renderEmptyState(icon, title, desc, actionBtnHtml = '') {
+    return `
+      <tr>
+        <td colspan="100" style="padding: 0; border: none;">
+          <div class="empty-state-box">
+            <div class="empty-state-icon">${icon}</div>
+            <div class="empty-state-title">${title}</div>
+            <div class="empty-state-desc">${desc}</div>
+            ${actionBtnHtml}
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  // =========================================================================
   // Utilities
   // =========================================================================
   closeModals() {
@@ -2404,13 +2605,16 @@ class AppController {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `<span>${message}</span>`;
+    toast.innerHTML = `
+      <span>${message}</span>
+      <div class="toast-progress"></div>
+    `;
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 300);
-    }, 3500);
+    }, 4000);
   }
 
   togglePasswordVisibility(inputId, btnId) {

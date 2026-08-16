@@ -1383,6 +1383,22 @@
         </div>
       </form>
     </div>
+  <!-- Global Spotlight Command Palette Modal (Ctrl+K) -->
+  <div id="modal-command-palette" class="command-palette-overlay" onclick="app.handleCommandPaletteBackdrop(event)">
+    <div class="command-palette-card" onclick="event.stopPropagation()">
+      <div class="command-palette-header">
+        <span style="font-size: 1.2rem; color: #818cf8;">⚡</span>
+        <input type="text" id="command-palette-input" class="command-palette-input" placeholder="Type a command, navigate, or search employees..." autocomplete="off" oninput="app.filterCommandPalette(this.value)" onkeydown="app.handleCommandPaletteKeydown(event)">
+        <span class="command-palette-badge">ESC</span>
+      </div>
+      <div id="command-palette-results" class="command-palette-body">
+        <!-- Rendered via JS -->
+      </div>
+      <div class="command-palette-footer">
+        <div><span>Navigation:</span> <kbd style="background: rgba(255,255,255,0.08); padding: 2px 5px; border-radius: 3px;">↑</kbd> <kbd style="background: rgba(255,255,255,0.08); padding: 2px 5px; border-radius: 3px;">↓</kbd> to move, <kbd style="background: rgba(255,255,255,0.08); padding: 2px 5px; border-radius: 3px;">Enter</kbd> to select</div>
+        <div style="color: #818cf8;">Apex HRMS Spotlight</div>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->

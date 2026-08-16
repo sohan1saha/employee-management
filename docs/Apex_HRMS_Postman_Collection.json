@@ -1,0 +1,216 @@
+{
+  "info": {
+    "_postman_id": "apex-hrms-v2-collection",
+    "name": "Apex HRMS Enterprise API",
+    "description": "Comprehensive Postman API Collection for Apex HRMS — Workforce Management, Shift Tracking, Statutory Payroll, 360 Appraisals, Document Vault & Observability.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://web-production-767f6.up.railway.app", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication & Security",
+      "item": [
+        {
+          "name": "Login (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 9924101,\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Get Current User Profile (/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/auth/logout", "host": ["{{base_url}}"], "path": ["api", "auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Attendance, Shifts & Breaks",
+      "item": [
+        {
+          "name": "Clock In",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Workstation Check-In\",\n  \"device_info\": \"Postman API Client v10\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/attendance/clock-in", "host": ["{{base_url}}"], "path": ["api", "attendance", "clock-in"] }
+          }
+        },
+        {
+          "name": "Start Break",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Coffee Break\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/attendance/break-start", "host": ["{{base_url}}"], "path": ["api", "attendance", "break-start"] }
+          }
+        },
+        {
+          "name": "End Break",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/attendance/break-end", "host": ["{{base_url}}"], "path": ["api", "attendance", "break-end"] }
+          }
+        },
+        {
+          "name": "Clock Out",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Completed Day Duties\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/attendance/clock-out", "host": ["{{base_url}}"], "path": ["api", "attendance", "clock-out"] }
+          }
+        },
+        {
+          "name": "Get Attendance Summary & KPIs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/attendance/summary", "host": ["{{base_url}}"], "path": ["api", "attendance", "summary"] }
+          }
+        },
+        {
+          "name": "Get Live Team On-Duty Roster",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/attendance/live-status", "host": ["{{base_url}}"], "path": ["api", "attendance", "live-status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Employee Directory",
+      "item": [
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/employees", "host": ["{{base_url}}"], "path": ["api", "employees"] }
+          }
+        },
+        {
+          "name": "Recommend Next Employee ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/employees/next-id?center=Bangalore&doj=2026-08-16", "host": ["{{base_url}}"], "path": ["api", "employees", "next-id"], "query": [{ "key": "center", "value": "Bangalore" }, { "key": "doj", "value": "2026-08-16" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Statutory Payroll Engine",
+      "item": [
+        {
+          "name": "Generate Monthly Batch Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month_year\": \"2026-08\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/payroll/generate", "host": ["{{base_url}}"], "path": ["api", "payroll", "generate"] }
+          }
+        },
+        {
+          "name": "List Payroll Records",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/payroll", "host": ["{{base_url}}"], "path": ["api", "payroll"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Performance Appraisals & 360",
+      "item": [
+        {
+          "name": "List Reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/performance/reviews", "host": ["{{base_url}}"], "path": ["api", "performance", "reviews"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Leaves & PTO",
+      "item": [
+        {
+          "name": "List Leaves",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/leaves", "host": ["{{base_url}}"], "path": ["api", "leaves"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. System & Observability",
+      "item": [
+        {
+          "name": "Prometheus Metrics (/metrics)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/metrics", "host": ["{{base_url}}"], "path": ["metrics"] }
+          }
+        },
+        {
+          "name": "System Health Diagnostic",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/system/health", "host": ["{{base_url}}"], "path": ["api", "system", "health"] }
+          }
+        }
+      ]
+    }
+  ]
+}
