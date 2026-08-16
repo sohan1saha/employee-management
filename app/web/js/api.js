@@ -275,10 +275,24 @@ class ApiClient {
   }
 
   // --- Attendance Endpoints ---
-  async clockIn(notes = '') {
+  async clockIn(notes = '', deviceInfo = '') {
     return await this.request('/attendance/clock-in', {
       method: 'POST',
+      body: JSON.stringify({ notes, device_info: deviceInfo })
+    });
+  }
+
+  async startBreak(notes = '') {
+    return await this.request('/attendance/break-start', {
+      method: 'POST',
       body: JSON.stringify({ notes })
+    });
+  }
+
+  async endBreak() {
+    return await this.request('/attendance/break-end', {
+      method: 'POST',
+      body: JSON.stringify({})
     });
   }
 

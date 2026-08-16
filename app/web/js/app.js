@@ -1600,27 +1600,83 @@ class AppController {
   }
 
   updateAttendanceWidgetState(summary) {
+    this.currentAttendanceSummary = summary;
     const badges = document.querySelectorAll('.attendance-status-badge, #emp-attendance-status-badge, #admin-attendance-status-badge');
+    const punctBadges = document.querySelectorAll('.punctuality-badge, #emp-punctuality-badge, #admin-punctuality-badge');
+    const otBadges = document.querySelectorAll('.overtime-badge, #emp-overtime-badge, #admin-overtime-badge');
     const timers = document.querySelectorAll('.attendance-stopwatch, #emp-attendance-timer, #admin-attendance-timer');
+    const breakLabels = document.querySelectorAll('.break-duration-label, #emp-break-label, #admin-break-label');
     const detailsEls = document.querySelectorAll('.attendance-details-text, #emp-attendance-details, #admin-attendance-details');
+    const deviceTags = document.querySelectorAll('.device-tag, #admin-device-tag');
     const btnsIn = document.querySelectorAll('.btn-clock-in, #btn-emp-clock-in');
+    const btnsBreak = document.querySelectorAll('.btn-break-toggle, #btn-emp-break');
     const btnsOut = document.querySelectorAll('.btn-clock-out, #btn-emp-clock-out');
+    const progressBars = document.querySelectorAll('.shift-progress-bar, #emp-shift-bar, #admin-shift-bar');
+    const progressPercents = document.querySelectorAll('.shift-progress-percent, #emp-shift-percent, #admin-shift-percent');
 
     if (summary.is_currently_clocked_in && summary.today_record) {
+      const rec = summary.today_record;
+      const clockInTime = this.parseUtcDate(rec.clock_in);
+      const isOnBreak = summary.is_on_break;
+
+      // Badges
       badges.forEach(b => {
-        b.innerText = 'ONLINE / ON DUTY';
-        b.style.background = 'rgba(16, 185, 129, 0.2)';
-        b.style.color = '#34d399';
+        if (isOnBreak) {
+          b.innerText = '☕ ON BREAK';
+          b.style.background = 'rgba(245, 158, 11, 0.2)';
+          b.style.color = '#fbbf24';
+        } else {
+          b.innerText = 'ONLINE / ON DUTY';
+          b.style.background = 'rgba(16, 185, 129, 0.2)';
+          b.style.color = '#34d399';
+        }
       });
+
+      // Punctuality Badge
+      punctBadges.forEach(pb => {
+        pb.style.display = 'inline-flex';
+        if (rec.punctuality_status === 'EARLY') {
+          pb.innerText = '🟢 Early Arrival';
+          pb.style.background = 'rgba(16, 185, 129, 0.15)';
+          pb.style.color = '#34d399';
+        } else if (rec.punctuality_status === 'LATE') {
+          pb.innerText = `🟡 Late by ${rec.late_minutes || 0}m`;
+          pb.style.background = 'rgba(245, 158, 11, 0.15)';
+          pb.style.color = '#fbbf24';
+        } else {
+          pb.innerText = '🟢 On-Time';
+          pb.style.background = 'rgba(16, 185, 129, 0.15)';
+          pb.style.color = '#34d399';
+        }
+      });
+
+      // Device Tag
+      deviceTags.forEach(dt => {
+        dt.innerText = `📍 IP: ${rec.ip_address || '127.0.0.1'} • ${rec.device_info || 'Web Browser'}`;
+      });
+
+      // Buttons
       btnsIn.forEach(b => b.disabled = true);
       btnsOut.forEach(b => b.disabled = false);
-
-      const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
-      detailsEls.forEach(d => {
-        d.innerText = `Clocked in at ${clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      btnsBreak.forEach(b => {
+        b.style.display = 'inline-flex';
+        if (isOnBreak) {
+          b.innerText = '▶ Resume Work';
+          b.className = 'btn btn-primary btn-sm btn-break-toggle';
+        } else {
+          b.innerText = '☕ Take Break';
+          b.className = 'btn btn-warning btn-sm btn-break-toggle';
+        }
       });
-      this.startAttendanceStopwatch(summary.today_record.clock_in);
+
+      detailsEls.forEach(d => {
+        const inStr = clockInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        d.innerText = `Clocked in at ${inStr} IST (${rec.scheduled_shift || 'General Shift'})`;
+      });
+
+      this.startAttendanceStopwatch(rec);
     } else if (summary.today_record && summary.today_record.clock_out) {
+      const rec = summary.today_record;
       if (this.attendanceStopwatchInterval) {
         clearInterval(this.attendanceStopwatchInterval);
         this.attendanceStopwatchInterval = null;
@@ -1631,24 +1687,42 @@ class AppController {
         b.style.background = 'rgba(59, 130, 246, 0.2)';
         b.style.color = '#60a5fa';
       });
+      punctBadges.forEach(pb => pb.style.display = 'none');
+      otBadges.forEach(ob => ob.style.display = rec.status === 'OVERTIME' ? 'inline-flex' : 'none');
       btnsIn.forEach(b => b.disabled = false);
       btnsOut.forEach(b => b.disabled = true);
-
-      const clockInTime = this.parseUtcDate(summary.today_record.clock_in);
-      const clockOutTime = this.parseUtcDate(summary.today_record.clock_out);
-      detailsEls.forEach(d => {
-        d.innerText = `Shift ended at ${clockOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${summary.today_record.total_hours} hrs logged)`;
+      btnsBreak.forEach(b => b.style.display = 'none');
+      breakLabels.forEach(bl => {
+        const breakMins = Math.floor((rec.total_break_seconds || 0) / 60);
+        if (breakMins > 0) {
+          bl.style.display = 'block';
+          bl.innerText = `☕ Total Break: ${breakMins} mins`;
+        } else {
+          bl.style.display = 'none';
+        }
       });
 
-      let totalSec = summary.today_record.elapsed_seconds;
+      const clockInTime = this.parseUtcDate(rec.clock_in);
+      const clockOutTime = this.parseUtcDate(rec.clock_out);
+      detailsEls.forEach(d => {
+        d.innerText = `Shift ended at ${clockOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${rec.total_hours} hrs active logged)`;
+      });
+
+      let totalSec = rec.elapsed_seconds;
       if (totalSec === undefined || totalSec === null) {
-        totalSec = Math.max(0, Math.floor((clockOutTime.getTime() - clockInTime.getTime()) / 1000));
+        totalSec = Math.max(0, Math.floor((clockOutTime.getTime() - clockInTime.getTime()) / 1000) - (rec.total_break_seconds || 0));
       }
       const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
       const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
       const secs = String(totalSec % 60).padStart(2, '0');
-      const timeStr = `${hrs}:${mins}:${secs}`;
-      timers.forEach(t => t.innerText = timeStr);
+      timers.forEach(t => {
+        t.innerText = `${hrs}:${mins}:${secs}`;
+        t.style.color = '#60a5fa';
+      });
+
+      const pct = Math.min(100, Math.round(((rec.total_hours || 0) / 8.0) * 100));
+      progressBars.forEach(pb => pb.style.width = `${pct}%`);
+      progressPercents.forEach(pp => pp.innerText = `${pct}% (${rec.total_hours || 0} / 8.0 hrs)`);
     } else {
       if (this.attendanceStopwatchInterval) {
         clearInterval(this.attendanceStopwatchInterval);
@@ -1659,31 +1733,90 @@ class AppController {
         b.style.background = 'rgba(100, 116, 139, 0.2)';
         b.style.color = '#94a3b8';
       });
+      punctBadges.forEach(pb => pb.style.display = 'none');
+      otBadges.forEach(ob => ob.style.display = 'none');
       btnsIn.forEach(b => b.disabled = false);
       btnsOut.forEach(b => b.disabled = true);
-      detailsEls.forEach(d => d.innerText = 'Shift not started');
-      timers.forEach(t => t.innerText = '00:00:00');
+      btnsBreak.forEach(b => b.style.display = 'none');
+      breakLabels.forEach(bl => bl.style.display = 'none');
+      detailsEls.forEach(d => d.innerText = 'Shift not started • General Shift (09:00 AM - 06:00 PM)');
+      timers.forEach(t => {
+        t.innerText = '00:00:00';
+        t.style.color = '#34d399';
+      });
+      progressBars.forEach(pb => pb.style.width = '0%');
+      progressPercents.forEach(pp => pp.innerText = '0% (0.0 / 8.0 hrs)');
     }
   }
 
-  startAttendanceStopwatch(clockInIso) {
+  startAttendanceStopwatch(todayRecord) {
     if (this.attendanceStopwatchInterval) {
       clearInterval(this.attendanceStopwatchInterval);
       this.attendanceStopwatchInterval = null;
     }
-    const clockInTime = this.parseUtcDate(clockInIso).getTime();
+    if (!todayRecord || !todayRecord.clock_in) return;
+
+    const clockInTime = this.parseUtcDate(todayRecord.clock_in).getTime();
+    const breakAccumulatedSec = todayRecord.total_break_seconds || 0;
+    const isOnBreak = !!todayRecord.is_on_break;
+    const breakStartTime = todayRecord.break_start ? this.parseUtcDate(todayRecord.break_start).getTime() : Date.now();
 
     const updateTimer = () => {
       const now = Date.now();
-      const elapsedMs = Math.max(0, now - clockInTime);
-      const totalSec = Math.floor(elapsedMs / 1000);
-      const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
-      const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
-      const secs = String(totalSec % 60).padStart(2, '0');
+      let currentBreakSec = 0;
+      if (isOnBreak) {
+        currentBreakSec = Math.max(0, Math.floor((now - breakStartTime) / 1000));
+      }
+
+      const totalBreakSec = breakAccumulatedSec + currentBreakSec;
+      const grossSec = Math.max(0, Math.floor((now - clockInTime) / 1000));
+      const netWorkingSec = Math.max(0, grossSec - totalBreakSec);
+
+      const hrs = String(Math.floor(netWorkingSec / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((netWorkingSec % 3600) / 60)).padStart(2, '0');
+      const secs = String(netWorkingSec % 60).padStart(2, '0');
       const timeStr = `${hrs}:${mins}:${secs}`;
 
       document.querySelectorAll('.attendance-stopwatch, #emp-attendance-timer, #admin-attendance-timer').forEach(el => {
         el.innerText = timeStr;
+        el.style.color = isOnBreak ? '#fbbf24' : (netWorkingSec >= 8 * 3600 ? '#c084fc' : '#34d399');
+      });
+
+      // Update Break Duration Labels
+      document.querySelectorAll('.break-duration-label, #emp-break-label, #admin-break-label').forEach(el => {
+        if (totalBreakSec > 0 || isOnBreak) {
+          el.style.display = 'block';
+          const bHrs = String(Math.floor(totalBreakSec / 3600)).padStart(2, '0');
+          const bMins = String(Math.floor((totalBreakSec % 3600) / 60)).padStart(2, '0');
+          const bSecs = String(totalBreakSec % 60).padStart(2, '0');
+          el.innerText = `☕ Total Break: ${bHrs}:${bMins}:${bSecs} ${isOnBreak ? '(Active)' : ''}`;
+        } else {
+          el.style.display = 'none';
+        }
+      });
+
+      // Overtime badge & progress bar
+      const netHours = netWorkingSec / 3600.0;
+      const isOvertime = netHours >= 8.0;
+      document.querySelectorAll('.overtime-badge, #emp-overtime-badge, #admin-overtime-badge').forEach(ob => {
+        if (isOvertime) {
+          ob.style.display = 'inline-flex';
+          const otSec = netWorkingSec - 8 * 3600;
+          const otH = Math.floor(otSec / 3600);
+          const otM = Math.floor((otSec % 3600) / 60);
+          ob.innerText = `🔥 Overtime (+${otH}h ${otM}m)`;
+        } else {
+          ob.style.display = 'none';
+        }
+      });
+
+      const pct = Math.min(100, Math.round((netHours / 8.0) * 100));
+      document.querySelectorAll('.shift-progress-bar, #emp-shift-bar, #admin-shift-bar').forEach(pb => {
+        pb.style.width = `${pct}%`;
+        pb.style.background = isOvertime ? 'linear-gradient(90deg, #10b981, #a855f7)' : 'linear-gradient(90deg, #3b82f6, #10b981)';
+      });
+      document.querySelectorAll('.shift-progress-percent, #emp-shift-percent, #admin-shift-percent').forEach(pp => {
+        pp.innerText = `${pct}% (${netHours.toFixed(1)} / 8.0 hrs)${isOvertime ? ' • 🎯 Target Met!' : ''}`;
       });
     };
 
@@ -1691,20 +1824,107 @@ class AppController {
     this.attendanceStopwatchInterval = setInterval(updateTimer, 1000);
   }
 
+  getBrowserAndDeviceInfo() {
+    const ua = navigator.userAgent;
+    let browser = "Web Browser";
+    let os = "Desktop";
+
+    if (ua.includes("Edg")) browser = "Microsoft Edge";
+    else if (ua.includes("Chrome")) browser = "Google Chrome";
+    else if (ua.includes("Safari")) browser = "Apple Safari";
+    else if (ua.includes("Firefox")) browser = "Mozilla Firefox";
+
+    if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS Device";
+    else if (ua.includes("Android")) os = "Android Mobile";
+    else if (ua.includes("Windows")) os = "Windows 10/11";
+    else if (ua.includes("Macintosh")) os = "macOS";
+    else if (ua.includes("Linux")) os = "Linux";
+
+    return `${browser} on ${os}`;
+  }
+
   async handleClockIn() {
     try {
-      await api.clockIn();
-      this.showToast('Successfully clocked in! Work timer started.', 'success');
+      const deviceInfo = this.getBrowserAndDeviceInfo();
+      const res = await api.clockIn('', deviceInfo);
+      
+      // Populate and Show Clock-In Confirmation Success Modal
+      const now = new Date();
+      const timeElem = document.getElementById('clockin-modal-time');
+      const punctElem = document.getElementById('clockin-modal-punctuality');
+      const shiftElem = document.getElementById('clockin-modal-shift');
+      const deviceElem = document.getElementById('clockin-modal-device');
+
+      if (timeElem) timeElem.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+      if (punctElem) {
+        if (res.punctuality_status === 'EARLY') {
+          punctElem.innerText = '🟢 Early Arrival';
+          punctElem.style.background = 'rgba(16,185,129,0.2)';
+          punctElem.style.color = '#34d399';
+        } else if (res.punctuality_status === 'LATE') {
+          punctElem.innerText = `🟡 Late by ${res.late_minutes || 0} mins`;
+          punctElem.style.background = 'rgba(245,158,11,0.2)';
+          punctElem.style.color = '#fbbf24';
+        } else {
+          punctElem.innerText = '🟢 On-Time / Punctual';
+          punctElem.style.background = 'rgba(16,185,129,0.2)';
+          punctElem.style.color = '#34d399';
+        }
+      }
+      if (shiftElem) shiftElem.innerText = res.scheduled_shift || 'General Shift (09:00 AM – 06:00 PM)';
+      if (deviceElem) deviceElem.innerText = `IP: ${res.ip_address || '127.0.0.1'} • ${res.device_info || deviceInfo}`;
+
+      const modal = document.getElementById('modal-clockin-success');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+      }
+
+      this.showToast('Successfully clocked in! Work stopwatch started.', 'success');
       await this.loadAttendanceData();
     } catch (err) {
       this.showToast(err.message || 'Clock in failed', 'error');
     }
   }
 
+  async handleToggleBreak() {
+    try {
+      const summary = this.currentAttendanceSummary;
+      if (!summary || !summary.is_currently_clocked_in) {
+        this.showToast('Please clock in before managing breaks.', 'error');
+        return;
+      }
+
+      if (summary.is_on_break) {
+        await api.endBreak();
+        this.showToast('Break ended. Resumed active shift!', 'success');
+      } else {
+        await api.startBreak();
+        this.showToast('Break started. Take your time!', 'info');
+      }
+      await this.loadAttendanceData();
+    } catch (err) {
+      this.showToast(err.message || 'Break toggle failed', 'error');
+    }
+  }
+
   async handleClockOut() {
+    const summary = this.currentAttendanceSummary;
+    let detailsSummary = 'Are you ready to clock out and finalize your working hours for today?';
+    if (summary && summary.today_record) {
+      const rec = summary.today_record;
+      const clockInTime = this.parseUtcDate(rec.clock_in).getTime();
+      const grossSec = Math.max(0, Math.floor((Date.now() - clockInTime) / 1000));
+      const netSec = Math.max(0, grossSec - (rec.total_break_seconds || 0));
+      const netH = (netSec / 3600.0).toFixed(1);
+      const breakM = Math.floor((rec.total_break_seconds || 0) / 60);
+      const isOt = netSec >= 8 * 3600;
+      detailsSummary = `You have logged ${netH} hrs of active work today (Break: ${breakM}m). ${isOt ? '🔥 Overtime verified.' : ''} Click Proceed to seal today's shift.`;
+    }
+
     const confirmed = await this.confirmAction({
       title: 'Clock Out & End Shift',
-      message: 'Are you ready to clock out and finalize your working hours for today?',
+      message: detailsSummary,
       proceedText: 'Clock Out',
       badge: 'ATTENDANCE SHIFT CLOSURE'
     });
@@ -1717,7 +1937,8 @@ class AppController {
 
     try {
       const res = await api.clockOut();
-      this.showToast(`Clocked out successfully! Logged ${res.total_hours} hrs today.`, 'success');
+      const otMsg = res.overtime_hours > 0 ? ` (Includes ${res.overtime_hours} hrs Overtime 🔥)` : '';
+      this.showToast(`Clocked out successfully! Logged ${res.total_hours} hrs today${otMsg}.`, 'success');
       await this.loadAttendanceData();
     } catch (err) {
       this.showToast(err.message || 'Clock out failed', 'error');
@@ -1739,11 +1960,12 @@ class AppController {
       tbody.innerHTML = history.map(rec => {
         const inTime = rec.clock_in ? this.parseUtcDate(rec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         const outTime = rec.clock_out ? this.parseUtcDate(rec.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '<span style="color:#34d399; font-weight:600;">ACTIVE</span>';
+        const breakM = Math.floor((rec.total_break_seconds || 0) / 60);
         
         let statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399;">PRESENT</span>`;
-        if (rec.status === 'OVERTIME') statusBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">OVERTIME</span>`;
+        if (rec.status === 'OVERTIME') statusBadge = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">🔥 OVERTIME</span>`;
         else if (rec.status === 'HALF_DAY') statusBadge = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24;">HALF DAY</span>`;
-        else if (rec.status === 'LATE') statusBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171;">LATE</span>`;
+        else if (rec.status === 'LATE' || rec.punctuality_status === 'LATE') statusBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171;">LATE (${rec.late_minutes}m)</span>`;
 
         return `
           <tr>
@@ -1752,9 +1974,12 @@ class AppController {
             <td>${rec.center || 'Corporate HQ'}</td>
             <td><code>${inTime}</code></td>
             <td><code>${outTime}</code></td>
-            <td><strong style="color:${rec.total_hours >= 8 ? '#34d399' : '#94a3b8'}">${rec.total_hours} hrs</strong></td>
+            <td>
+              <strong style="color:${rec.total_hours >= 8 ? '#34d399' : '#94a3b8'}">${rec.total_hours} hrs</strong>
+              ${breakM > 0 ? `<small style="color:var(--text-muted); display:block; font-size:0.7rem;">(${breakM}m break)</small>` : ''}
+            </td>
             <td>${statusBadge}</td>
-            <td><span style="font-size:0.75rem; color:var(--text-muted);">${rec.notes || rec.ip_address || '—'}</span></td>
+            <td><span style="font-size:0.75rem; color:var(--text-muted);">${rec.device_info || rec.ip_address || '—'}</span></td>
           </tr>
         `;
       }).join('');

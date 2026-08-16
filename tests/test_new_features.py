@@ -103,36 +103,65 @@ def get_auth_header(employee_id: int, role: str) -> dict:
 
 
 # =============================================================================
-# Test Suite 1: Attendance & Check-In/Out
+# Test Suite 1: Attendance, Shifts, Breaks & Check-In/Out
 # =============================================================================
 def test_attendance_clock_in_and_clock_out(client, test_db):
     staff_headers = get_auth_header(1025102, "EMPLOYEE")
 
-    # 1. Clock in
-    res_in = client.post("/api/attendance/clock-in", json={"notes": "WFH Station"}, headers=staff_headers)
+    # 1. Clock in with device info
+    res_in = client.post(
+        "/api/attendance/clock-in",
+        json={"notes": "WFH Station", "device_info": "Google Chrome on Windows 11"},
+        headers=staff_headers
+    )
     assert res_in.status_code == 200
     data_in = res_in.json()
     assert data_in["employee_id"] == 1025102
-    assert data_in["status"] == "PRESENT"
+    assert data_in["status"] in ["PRESENT", "LATE"]
     assert data_in["clock_out"] is None
+    assert "Google Chrome on Windows 11" in data_in["device_info"]
+    assert data_in["punctuality_status"] in ["ON_TIME", "EARLY", "LATE"]
+    assert data_in["scheduled_shift"] == "General Shift (09:00 AM - 06:00 PM)"
 
-    # 2. Prevent duplicate clock in
+    # 2. Prevent duplicate double clock in
     res_dup = client.post("/api/attendance/clock-in", json={}, headers=staff_headers)
     assert res_dup.status_code == 400
+    assert "Active shift already in progress" in res_dup.json()["detail"]
 
-    # 3. Summary check
+    # 3. Start break
+    res_break_start = client.post("/api/attendance/break-start", json={"notes": "Lunch Break"}, headers=staff_headers)
+    assert res_break_start.status_code == 200
+    break_data = res_break_start.json()
+    assert break_data["is_on_break"] is True
+    assert break_data["break_start"] is not None
+
+    # 4. Prevent duplicate break start
+    res_break_dup = client.post("/api/attendance/break-start", json={}, headers=staff_headers)
+    assert res_break_dup.status_code == 400
+
+    # 5. End break
+    res_break_end = client.post("/api/attendance/break-end", headers=staff_headers)
+    assert res_break_end.status_code == 200
+    res_end_data = res_break_end.json()
+    assert res_end_data["is_on_break"] is False
+    assert res_end_data["break_start"] is None
+
+    # 6. Summary check
     res_sum = client.get("/api/attendance/summary", headers=staff_headers)
     assert res_sum.status_code == 200
-    assert res_sum.json()["is_currently_clocked_in"] is True
+    sum_data = res_sum.json()
+    assert sum_data["is_currently_clocked_in"] is True
+    assert sum_data["is_on_break"] is False
 
-    # 4. Clock out
+    # 7. Clock out
     res_out = client.post("/api/attendance/clock-out", json={"notes": "Done for today"}, headers=staff_headers)
     assert res_out.status_code == 200
     data_out = res_out.json()
     assert data_out["clock_out"] is not None
     assert "total_hours" in data_out
+    assert "overtime_hours" in data_out
 
-    # 5. History check
+    # 8. History check
     res_hist = client.get("/api/attendance/history", headers=staff_headers)
     assert res_hist.status_code == 200
     assert len(res_hist.json()) >= 1

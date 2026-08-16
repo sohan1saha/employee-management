@@ -238,34 +238,65 @@
 
             <!-- Manager / Admin Personal Attendance & Shift Tracker -->
             <div class="card attendance-widget-card" id="manager-attendance-card" style="margin-top: 24px; background: linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.95)); border: 1px solid rgba(255,255,255,0.08);">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                  <div style="font-size: 2rem;">⏱️</div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: flex-start; gap: 14px;">
+                  <div style="font-size: 2.2rem; line-height: 1;">⏱️</div>
                   <div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                       <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0;">My Shift & Work Hours Today</h3>
                       <span class="badge attendance-status-badge badge-warning" id="admin-attendance-status-badge">NOT CLOCKED IN</span>
+                      <span class="badge punctuality-badge" id="admin-punctuality-badge" style="display: none; background: rgba(16,185,129,0.15); color: #34d399;">🟢 On-Time</span>
+                      <span class="badge overtime-badge" id="admin-overtime-badge" style="display: none; background: rgba(168,85,247,0.15); color: #c084fc;">🔥 Overtime</span>
                     </div>
-                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" class="attendance-details-text" id="admin-attendance-details">
+                    
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                      <span class="shift-tag" style="font-size: 0.76rem; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; color: #93c5fd; border: 1px solid rgba(147,197,253,0.2);">
+                        📅 General Shift (09:00 AM – 06:00 PM IST • 8.0h Target)
+                      </span>
+                      <span class="device-tag" id="admin-device-tag" style="font-size: 0.74rem; color: var(--text-muted);">
+                        📍 Auditing Active
+                      </span>
+                    </div>
+
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;" class="attendance-details-text" id="admin-attendance-details">
                       Punch in when beginning operations to log active duty hours.
                     </div>
                   </div>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 20px;">
-                  <div>
-                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
-                    <div class="attendance-stopwatch" id="admin-attendance-timer" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div>
+                      <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
+                      <div class="attendance-stopwatch" id="admin-attendance-timer" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                      <div class="break-duration-label" id="admin-break-label" style="display: none; font-size: 0.75rem; color: #fbbf24; font-weight: 600;">☕ Break: 00:00:00</div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 95px;">
+                        ▶ Clock In
+                      </button>
+                      <button type="button" class="btn btn-warning btn-sm btn-break-toggle" onclick="app.handleToggleBreak()" style="min-width: 100px; display: none;">
+                        ☕ Take Break
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 95px;" disabled>
+                        ⏹ Clock Out
+                      </button>
+                    </div>
                   </div>
-                  <div style="display: flex; gap: 8px;">
-                    <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 105px;">
-                      ▶ Clock In
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 105px;" disabled>
-                      ⏹ Clock Out
-                    </button>
+
+                  <!-- Shift Target Progress Bar -->
+                  <div class="shift-progress-wrap" style="width: 100%; min-width: 240px; max-width: 320px; margin-top: 2px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px;">
+                      <span>Shift Target</span>
+                      <span class="shift-progress-percent" id="admin-shift-percent">0% (0.0 / 8.0 hrs)</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div class="shift-progress-bar" id="admin-shift-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 3px; transition: width 0.4s ease;"></div>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -435,24 +466,49 @@
                 
                 <!-- Live Attendance & Daily Clock In / Out Widget -->
                 <div class="card attendance-widget-card" id="emp-attendance-card">
-                  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 class="card-title">⏱️ Today's Attendance & Time Tracker</h3>
-                    <span class="badge" id="emp-attendance-status-badge" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8;">NOT CLOCKED IN</span>
+                  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <h3 class="card-title" style="margin: 0;">⏱️ Today's Shift & Attendance</h3>
+                      <span class="badge punctuality-badge" id="emp-punctuality-badge" style="display: none; background: rgba(16,185,129,0.15); color: #34d399;">🟢 On-Time</span>
+                      <span class="badge overtime-badge" id="emp-overtime-badge" style="display: none; background: rgba(168,85,247,0.15); color: #c084fc;">🔥 Overtime</span>
+                    </div>
+                    <span class="badge attendance-status-badge" id="emp-attendance-status-badge" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8;">NOT CLOCKED IN</span>
                   </div>
                   
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0 16px 0; flex-wrap: wrap;">
+                  <div style="margin: 8px 0 12px 0;">
+                    <span class="shift-tag" style="font-size: 0.76rem; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; color: #93c5fd; border: 1px solid rgba(147,197,253,0.2);">
+                      📅 General Shift (09:00 AM – 06:00 PM IST • 8.0h Target)
+                    </span>
+                  </div>
+
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0 14px 0; flex-wrap: wrap;">
                     <div>
-                      <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours Today</div>
-                      <div class="attendance-stopwatch" id="emp-attendance-timer">00:00:00</div>
-                      <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;" id="emp-attendance-details">Clock-in: Not started</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours Today</div>
+                      <div class="attendance-stopwatch" id="emp-attendance-timer" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                      <div class="break-duration-label" id="emp-break-label" style="display: none; font-size: 0.75rem; color: #fbbf24; font-weight: 600;">☕ Break: 00:00:00</div>
+                      <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;" class="attendance-details-text" id="emp-attendance-details">Clock-in: Not started</div>
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                      <button type="button" class="btn btn-primary btn-sm" id="btn-emp-clock-in" onclick="app.handleClockIn()" style="min-width: 105px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <button type="button" class="btn btn-primary btn-sm btn-clock-in" id="btn-emp-clock-in" onclick="app.handleClockIn()" style="min-width: 95px;">
                         ▶ Clock In
                       </button>
-                      <button type="button" class="btn btn-secondary btn-sm" id="btn-emp-clock-out" onclick="app.handleClockOut()" style="min-width: 105px;" disabled>
+                      <button type="button" class="btn btn-warning btn-sm btn-break-toggle" id="btn-emp-break" onclick="app.handleToggleBreak()" style="min-width: 100px; display: none;">
+                        ☕ Take Break
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm btn-clock-out" id="btn-emp-clock-out" onclick="app.handleClockOut()" style="min-width: 95px;" disabled>
                         ⏹ Clock Out
                       </button>
+                    </div>
+                  </div>
+
+                  <!-- Shift Target Progress Bar -->
+                  <div class="shift-progress-wrap" style="width: 100%; margin-top: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px;">
+                      <span>Shift Target Progress</span>
+                      <span class="shift-progress-percent" id="emp-shift-percent">0% (0.0 / 8.0 hrs)</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div class="shift-progress-bar" id="emp-shift-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 3px; transition: width 0.4s ease;"></div>
                     </div>
                   </div>
                 </div>
@@ -688,34 +744,65 @@
         <section id="view-attendance" class="app-view" style="display: none;">
           <!-- Personal Shift & Attendance Punch Tracker -->
           <div class="card attendance-widget-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.95)); border: 1px solid rgba(255,255,255,0.08);">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-              <div style="display: flex; align-items: center; gap: 16px;">
-                <div style="font-size: 2rem;">⏱️</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+              <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div style="font-size: 2.2rem; line-height: 1;">⏱️</div>
                 <div>
-                  <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0;">Today's Attendance & Time Tracker</h3>
                     <span class="badge attendance-status-badge badge-warning">NOT CLOCKED IN</span>
+                    <span class="badge punctuality-badge" style="display: none; background: rgba(16,185,129,0.15); color: #34d399;">🟢 On-Time</span>
+                    <span class="badge overtime-badge" style="display: none; background: rgba(168,85,247,0.15); color: #c084fc;">🔥 Overtime</span>
                   </div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" class="attendance-details-text">
+                  
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                    <span class="shift-tag" style="font-size: 0.76rem; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; color: #93c5fd; border: 1px solid rgba(147,197,253,0.2);">
+                      📅 General Shift (09:00 AM – 06:00 PM IST • 8.0h Target)
+                    </span>
+                    <span class="device-tag" style="font-size: 0.74rem; color: var(--text-muted);">
+                      📍 Auditing Active
+                    </span>
+                  </div>
+
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;" class="attendance-details-text">
                     Punch in when beginning operations to log active duty hours.
                   </div>
                 </div>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 20px;">
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
-                  <div class="attendance-stopwatch" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                  <div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Work Hours</div>
+                    <div class="attendance-stopwatch" style="font-size: 1.6rem; font-weight: 800; font-family: monospace; color: #34d399; letter-spacing: 1px;">00:00:00</div>
+                    <div class="break-duration-label" style="display: none; font-size: 0.75rem; color: #fbbf24; font-weight: 600;">☕ Break: 00:00:00</div>
+                  </div>
+                  
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 95px;">
+                      ▶ Clock In
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm btn-break-toggle" onclick="app.handleToggleBreak()" style="min-width: 100px; display: none;">
+                      ☕ Take Break
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 95px;" disabled>
+                      ⏹ Clock Out
+                    </button>
+                  </div>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                  <button type="button" class="btn btn-primary btn-sm btn-clock-in" onclick="app.handleClockIn()" style="min-width: 105px;">
-                    ▶ Clock In
-                  </button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-clock-out" onclick="app.handleClockOut()" style="min-width: 105px;" disabled>
-                    ⏹ Clock Out
-                  </button>
+
+                <!-- Shift Target Progress Bar -->
+                <div class="shift-progress-wrap" style="width: 100%; min-width: 240px; max-width: 320px; margin-top: 2px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px;">
+                    <span>Shift Target</span>
+                    <span class="shift-progress-percent">0% (0.0 / 8.0 hrs)</span>
+                  </div>
+                  <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                    <div class="shift-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 3px; transition: width 0.4s ease;"></div>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
 
@@ -1067,6 +1154,50 @@
         </button>
         <button type="button" class="btn btn-primary" id="btn-confirm-proceed" onclick="app.executeConfirmAction()" style="min-width: 110px;">
           Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shift Clock-In Confirmation Success Modal -->
+  <div id="modal-clockin-success" class="modal-overlay">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: #34d399; display: flex; align-items: center; gap: 8px;">
+          <span>✅</span> Shift Clock-In Confirmed
+        </h3>
+        <button class="modal-close" onclick="app.closeModals()">✕</button>
+      </div>
+      <div style="padding: 10px 0 16px 0;">
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Punch Timestamp (IST):</span>
+            <strong id="clockin-modal-time" style="font-size: 1.05rem; color: #fff;">09:00:00 AM</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Punctuality Status:</span>
+            <span id="clockin-modal-punctuality" class="badge" style="background: rgba(16,185,129,0.2); color: #34d399;">🟢 On-Time</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Scheduled Shift:</span>
+            <strong id="clockin-modal-shift" style="font-size: 0.86rem; color: #93c5fd;">General Shift (09:00 AM – 06:00 PM)</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Target Active Hours:</span>
+            <strong style="font-size: 0.86rem; color: #34d399;">8.0 Hours Expected</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+            <span style="font-size: 0.76rem; color: var(--text-muted);">Audited Location & Device:</span>
+            <span id="clockin-modal-device" style="font-size: 0.76rem; color: var(--text-muted);">IP: 127.0.0.1 • Web Browser</span>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+          Your attendance record has been locked and timestamped in the immutable audit vault. You can toggle break sessions or review shift progress anytime.
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary" onclick="app.closeModals()" style="width: 100%; justify-content: center;">
+          Acknowledge & Continue
         </button>
       </div>
     </div>
