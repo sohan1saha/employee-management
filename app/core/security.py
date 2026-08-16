@@ -121,7 +121,7 @@ def decode_token(token: str) -> Optional[dict]:
         # 2. Check if all sessions for user were invalidated (e.g., password change / logout all)
         if sub and iat:
             revoked_after = get_user_session_revoked_timestamp(str(sub))
-            if revoked_after is not None and iat < revoked_after:
+            if revoked_after is not None and iat <= revoked_after:
                 return None
 
         return payload

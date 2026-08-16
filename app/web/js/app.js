@@ -171,6 +171,21 @@ class AppController {
     document.getElementById('add-ecen').addEventListener('input', () => this.debounce(() => this.refreshRecommendedEmployeeId(), 300));
     document.getElementById('add-edoj').addEventListener('change', () => this.refreshRecommendedEmployeeId());
 
+    // Salary Calculator live input listener
+    const calcGrossInput = document.getElementById('calc-gross-salary');
+    if (calcGrossInput) {
+      calcGrossInput.addEventListener('input', () => this.calculateDynamicSalaryBreakdown());
+    }
+
+    // Dismiss modals when clicking backdrop overlay
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          this.closeModals();
+        }
+      });
+    });
+
     // Global unauthorized handler
     window.addEventListener('auth:unauthorized', () => {
       this.showLoginOverlay();
@@ -751,7 +766,11 @@ class AppController {
   // Salary Calculator & Export Utilities
   // =========================================================================
   openSalaryCalculatorModal() {
-    document.getElementById('modal-salary-calculator').classList.add('active');
+    const modal = document.getElementById('modal-salary-calculator');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
     this.calculateDynamicSalaryBreakdown();
   }
 
@@ -898,7 +917,11 @@ class AppController {
       }
     }
 
-    document.getElementById('modal-add-employee').classList.add('active');
+    const modal = document.getElementById('modal-add-employee');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
     await this.refreshRecommendedEmployeeId();
   }
 
@@ -1053,7 +1076,7 @@ class AppController {
           <td><strong style="color: var(--success);">₹${r.net_salary.toLocaleString('en-IN')}</strong></td>
           <td><span class="badge badge-paid">${r.payment_status}</span></td>
           <td>
-            <button class="btn btn-primary btn-sm" onclick="api.downloadPayslip(${r.id}, 'Payslip_${r.employee_name}_${r.month_year}.pdf')">
+            <button class="btn btn-primary btn-sm" onclick="app.downloadPayslipPdf(${r.id}, '${(r.employee_name || 'Staff').replace(/'/g, "\\'")}', '${r.month_year}')">
               Download PDF
             </button>
           </td>
@@ -1061,6 +1084,18 @@ class AppController {
       `).join('');
     } catch (err) {
       this.showToast('Failed to load payroll', 'error');
+    }
+  }
+
+  async downloadPayslipPdf(recordId, employeeName = 'Employee', monthYear = 'Payroll') {
+    try {
+      const sanitized = String(employeeName).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Payslip_${sanitized}_${monthYear}.pdf`;
+      this.showToast(`Generating payslip for ${employeeName}...`, 'info');
+      await api.downloadPayslip(recordId, filename);
+      this.showToast(`Payslip downloaded successfully!`, 'success');
+    } catch (err) {
+      this.showToast(err.message || 'Failed to download payslip PDF', 'error');
     }
   }
 

@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.user_schema import UserLogin, TokenResponse, PasswordChangeRequest, RefreshTokenRequest
 from app.api.deps import get_current_user, get_request_id
 from app.services.audit_service import record_audit
+from app.services.cache_service import cache
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -98,6 +99,9 @@ def login(
     user.failed_login_attempts = 0
     user.locked_until = None
     db.commit()
+
+    # Clear previous user session revocation key on fresh authentication
+    cache.delete(f"user_session_revocation:{user.employee_id}")
 
     # Generate session tokens
     session_id = str(uuid.uuid4())
@@ -287,6 +291,21 @@ def change_password(
 
     # 5. Invalidate all existing tokens and sessions for this user
     revoke_user_sessions(str(current_user.employee_id))
+    
+    # Invalidate caller token JTI if present
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            curr_token = auth_header.split(" ")[1]
+            raw_payload = jwt.decode(curr_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
+            curr_jti = raw_payload.get("jti")
+            if curr_jti:
+                revoke_token(curr_jti)
+        except Exception:
+            pass
+
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
 
     # 6. Audit log
     record_audit(
