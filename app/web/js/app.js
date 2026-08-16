@@ -283,46 +283,22 @@ class AppController {
     if (target) target.style.display = 'block';
 
     const titles = {
-      dashboard: [
-        api.user?.role === 'EMPLOYEE'
-          ? 'My Workspace'
-          : (api.user?.role === 'MANAGER' && this.availableCenters?.length === 1
-              ? `${this.availableCenters[0]} Center Dashboard`
-              : 'Executive Dashboard'),
-        api.user?.role === 'EMPLOYEE'
-          ? 'Personal overview, salary structure, and time-off balance'
-          : (api.user?.role === 'MANAGER'
-              ? 'Center workforce intelligence and operations overview'
-              : 'Real-time workforce intelligence and operations overview')
-      ],
-      attendance: [
-        api.user?.role === 'EMPLOYEE' ? 'My Attendance & Hours Tracker' : 'Attendance & Time Operations',
-        api.user?.role === 'EMPLOYEE' ? 'Track your daily check-in times and accumulated monthly work hours' : 'Enterprise daily check-in/out logs and active team roster'
-      ],
-      employees: ['Employee Directory', 'Master records and profile management'],
-      payroll: [
-        api.user?.role === 'EMPLOYEE' ? 'My Payslips & Compensation' : 'Payroll Hub & Compensation',
-        api.user?.role === 'EMPLOYEE' ? 'View and download your monthly salary statements' : 'Automated monthly salary calculation and PDF payslips'
-      ],
-      leaves: [
-        api.user?.role === 'EMPLOYEE' ? 'My Leaves & Attendance' : 'Leaves & Attendance',
-        api.user?.role === 'EMPLOYEE' ? 'Submit and track your time off applications' : 'Employee time-off requests and manager approvals'
-      ],
-      performance: [
-        api.user?.role === 'EMPLOYEE' ? 'My Performance & Appraisals' : 'Performance & Appraisals Hub',
-        api.user?.role === 'EMPLOYEE' ? 'Review quarterly evaluations and manager feedback' : 'Quarterly 360 appraisals, goal achievements, and scoring'
-      ],
-      documents: [
-        api.user?.role === 'EMPLOYEE' ? 'My Document Vault' : 'Document Vault & Compliance',
-        api.user?.role === 'EMPLOYEE' ? 'Upload and manage your contracts, ID proofs, and certifications' : 'Employee compliance file archive, ID proofs, and contracts'
-      ],
-      audit: ['Audit Trail & Compliance', 'Append-only activity logs with IP and correlation request ID tracing']
+      dashboard: api.user?.role === 'EMPLOYEE'
+        ? 'My Workspace'
+        : (api.user?.role === 'MANAGER' && this.availableCenters?.length === 1
+            ? `${this.availableCenters[0]} Dashboard`
+            : 'Dashboard'),
+      attendance: api.user?.role === 'EMPLOYEE' ? 'My Attendance' : 'Attendance',
+      employees: 'Employee Directory',
+      payroll: api.user?.role === 'EMPLOYEE' ? 'My Payslips' : 'Payroll Hub',
+      leaves: api.user?.role === 'EMPLOYEE' ? 'My Leaves & PTO' : 'Leaves & PTO',
+      performance: api.user?.role === 'EMPLOYEE' ? 'My Performance' : 'Performance & Appraisals',
+      documents: api.user?.role === 'EMPLOYEE' ? 'My Documents' : 'Document Vault',
+      audit: 'Audit Trail'
     };
 
     const titleEl = document.getElementById('page-title');
-    const subtitleEl = document.getElementById('page-subtitle');
-    if (titleEl) titleEl.innerText = titles[viewName]?.[0] || 'Dashboard';
-    if (subtitleEl) subtitleEl.innerText = titles[viewName]?.[1] || '';
+    if (titleEl) titleEl.innerText = titles[viewName] || 'Dashboard';
 
     this.closeMobileSidebar();
     this.refreshCurrentView();

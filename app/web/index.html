@@ -66,8 +66,7 @@
             </g>
           </svg>
         </div>
-        <h2 style="font-size: 1.65rem; font-weight: 800; color: #fff; letter-spacing: -0.5px;">Apex HRMS</h2>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 6px;">Enterprise Workforce & Payroll Platform</p>
+        <h2 style="font-size: 1.65rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin-bottom: 8px;">Apex HRMS</h2>
       </div>
 
       <form id="login-form">
@@ -141,7 +140,6 @@
               </div>
               <div>
                 <div class="brand-title">Apex HRMS</div>
-                <div class="brand-subtitle">Enterprise Platform</div>
               </div>
             </a>
             <button type="button" class="sidebar-mobile-close" id="btn-sidebar-close" onclick="app.closeMobileSidebar()" aria-label="Close Sidebar">✕</button>
@@ -211,7 +209,6 @@
           </button>
           <div>
             <h1 class="page-title" id="page-title">Executive Dashboard</h1>
-            <p class="page-subtitle" id="page-subtitle">Real-time workforce intelligence and operations overview</p>
           </div>
         </div>
 
@@ -271,7 +268,6 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
               <div>
                 <h2 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin: 0;">Workforce Intelligence & Operations</h2>
-                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 3px 0 0 0;">Real-time headcount, financial burn rate, compensation metrics, and attendance tracking.</p>
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button class="btn btn-secondary btn-sm" onclick="app.openSalaryCalculatorModal()" style="display: inline-flex; align-items: center; gap: 6px;">
@@ -793,10 +789,7 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h3 class="card-title">Immutable Security & Modification Audit Trail</h3>
-                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                  Automatic zero-trust logging of all CRUD actions, salary updates, and approvals.
-                </p>
+                <h3 class="card-title">Security & Audit Trail</h3>
               </div>
               <button class="btn btn-secondary btn-sm" onclick="app.loadAuditLogs()">Refresh Logs</button>
             </div>
@@ -924,8 +917,7 @@
           <div class="card" id="att-live-team-board" style="display: none; margin-bottom: 24px;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <h3 class="card-title">🟢 Live On-Duty Team Roster (Today)</h3>
-                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">Real-time view of currently checked-in employees across centers.</p>
+                <h3 class="card-title">🟢 Live On-Duty Team Roster</h3>
               </div>
               <button class="btn btn-secondary btn-sm" onclick="app.loadAttendanceData()">Refresh Status</button>
             </div>
@@ -972,10 +964,7 @@
           <div class="card" style="margin-bottom: 24px;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 class="card-title">⭐ Performance Reviews & Quarterly Appraisals</h3>
-                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                  360-degree performance evaluations, goal scoring, and manager feedback.
-                </p>
+                <h3 class="card-title">⭐ Performance Reviews & Appraisals</h3>
               </div>
               <button class="btn btn-primary btn-sm" id="btn-open-add-review" onclick="app.openAddReviewModal()" style="display: none;">
                 + Conduct New Appraisal
@@ -994,10 +983,7 @@
           <div class="card" style="margin-bottom: 24px;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 class="card-title">📁 Employee Document Vault & Compliance Files</h3>
-                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                  Secure storage for ID proofs, signed contracts, academic certificates, and tax documents.
-                </p>
+                <h3 class="card-title">📁 Document Vault & Compliance Files</h3>
               </div>
               <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <div id="doc-emp-selector-wrap" style="display: none;">
