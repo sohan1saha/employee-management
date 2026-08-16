@@ -17,9 +17,9 @@ def get_analytics_summary(
 ):
     """Retrieve workforce KPIs for Admins/Managers or self-service dashboard metrics for Employees (with intelligent caching)."""
     if current_user.role == "EMPLOYEE" and current_user.employee_id:
-        cache_key = f"analytics:emp:{current_user.employee_id}"
+        cache_key = f"analytics_v2:emp:{current_user.employee_id}"
         cached = cache.get(cache_key)
-        if cached is not None:
+        if cached is not None and isinstance(cached, dict) and "kpis" in cached:
             return cached
         data = get_employee_dashboard_analytics(db, employee_id=current_user.employee_id)
         cache.set(cache_key, data, ttl_seconds=120)
@@ -27,9 +27,9 @@ def get_analytics_summary(
 
     scoped_center = get_user_scope_center(db, current_user)
     center_key = scoped_center or "all"
-    cache_key = f"analytics:admin:{center_key}"
+    cache_key = f"analytics_v2:admin:{center_key}"
     cached = cache.get(cache_key)
-    if cached is not None:
+    if cached is not None and isinstance(cached, dict) and "payroll_trends" in cached and "salary_distribution" in cached:
         return cached
 
     data = get_dashboard_analytics(db, center=scoped_center)
