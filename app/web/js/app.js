@@ -1063,19 +1063,25 @@ class AppController {
 
   async handleAddEmployee(e) {
     e.preventDefault();
+    const systemRole = document.getElementById('add-system-role')?.value || 'EMPLOYEE';
+    const initPwd = document.getElementById('add-initial-password')?.value.trim() || undefined;
+
     const payload = {
       eid: parseInt(document.getElementById('add-eid').value),
       ename: document.getElementById('add-ename').value.trim(),
       ecen: document.getElementById('add-ecen').value.trim(),
       epos: document.getElementById('add-epos').value.trim(),
       esal: parseFloat(document.getElementById('add-esal').value),
-      edoj: document.getElementById('add-edoj').value
+      edoj: document.getElementById('add-edoj').value,
+      system_role: systemRole,
+      initial_password: initPwd
     };
 
     try {
       await api.createEmployee(payload);
       this.closeModals();
-      this.showToast(`Employee #${payload.eid} added successfully!`, 'success');
+      const roleMsg = systemRole === 'MANAGER' ? ` as ${payload.ecen} Branch Manager (Authority Granted)` : '';
+      this.showToast(`Employee #${payload.eid} created successfully${roleMsg}!`, 'success');
       this.loadEmployees();
       this.loadCentersDropdowns();
     } catch (err) {
@@ -1092,13 +1098,22 @@ class AppController {
       document.getElementById('edit-ecen').value = emp.ecen;
       if (api.user?.role === 'MANAGER') {
         document.getElementById('edit-ecen').readOnly = true;
+        const roleWrap = document.getElementById('edit-system-role-wrap');
+        if (roleWrap) roleWrap.style.display = 'none';
       } else {
         document.getElementById('edit-ecen').readOnly = false;
+        const roleWrap = document.getElementById('edit-system-role-wrap');
+        if (roleWrap) roleWrap.style.display = 'block';
       }
       document.getElementById('edit-epos').value = emp.epos;
       document.getElementById('edit-esal').value = emp.esal;
       document.getElementById('edit-esal').dataset.originalSalary = emp.esal;
       document.getElementById('edit-status').value = emp.status;
+
+      const roleSelect = document.getElementById('edit-system-role');
+      if (roleSelect) {
+        roleSelect.value = emp.epos && emp.epos.toLowerCase().includes('manager') ? 'MANAGER' : 'EMPLOYEE';
+      }
 
       document.getElementById('modal-edit-employee').style.display = 'flex';
       document.getElementById('modal-edit-employee').classList.add('active');
@@ -1133,7 +1148,8 @@ class AppController {
       ecen: document.getElementById('edit-ecen').value.trim(),
       epos: document.getElementById('edit-epos').value.trim(),
       esal: newSal,
-      status: document.getElementById('edit-status').value
+      status: document.getElementById('edit-status').value,
+      system_role: document.getElementById('edit-system-role')?.value
     };
 
     try {

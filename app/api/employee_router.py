@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 
 from app.core.database import get_db
+from app.core.security import get_password_hash
 from app.models.employee import Employee
 from app.models.user import User
 from app.models.sequence import EmployeeSequence
@@ -241,6 +242,29 @@ def create_employee(
     db.commit()
     db.refresh(employee)
 
+    # Auto-provision login account for the employee with specified or inferred role
+    role_to_set = "EMPLOYEE"
+    if emp_in.system_role:
+        role_to_set = emp_in.system_role.upper()
+    elif "manager" in emp_in.epos.lower():
+        role_to_set = "MANAGER"
+
+    existing_user = db.query(User).filter(User.employee_id == employee.eid).first()
+    if not existing_user:
+        raw_pwd = emp_in.initial_password or ("manager123" if role_to_set == "MANAGER" else "employee123")
+        new_user = User(
+            email=employee.email,
+            hashed_password=get_password_hash(raw_pwd),
+            role=role_to_set,
+            employee_id=employee.eid,
+            is_active=True
+        )
+        db.add(new_user)
+        db.commit()
+    elif emp_in.system_role and current_user.role == "ADMIN":
+        existing_user.role = role_to_set
+        db.commit()
+
     record_audit(
         db=db,
         action="EMPLOYEE_CREATED",
@@ -248,7 +272,7 @@ def create_employee(
         user_id=current_user.id,
         username=f"#{current_user.employee_id}",
         role=current_user.role,
-        new_value=f"Name: {employee.ename}, Center: {employee.ecen}, Pos: {employee.epos}, Sal: ₹{employee.esal}",
+        new_value=f"Name: {employee.ename}, Center: {employee.ecen}, Pos: {employee.epos}, Role: {role_to_set}, Sal: ₹{employee.esal}",
         client_ip=client_ip,
         user_agent=user_agent,
         request_id=req_id
@@ -298,8 +322,15 @@ def update_employee(
             changes_new.append(f"{field}: {new_val}")
             setattr(emp, field, new_val)
 
-    db.commit()
-    db.refresh(emp)
+    # If system_role or position changed, sync linked user role
+    user_record = db.query(User).filter(User.employee_id == eid).first()
+    if user_record and current_user.role == "ADMIN":
+        if emp_in.system_role:
+            user_record.role = emp_in.system_role.upper()
+        elif emp_in.epos:
+            if "manager" in emp_in.epos.lower():
+                user_record.role = "MANAGER"
+        db.commit()
 
     if changes_new:
         record_audit(

@@ -1057,6 +1057,21 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="add-system-role">System Access Role</label>
+            <select id="add-system-role" class="select-custom" style="width: 100%;">
+              <option value="EMPLOYEE">EMPLOYEE (Standard Staff)</option>
+              <option value="MANAGER">MANAGER (Branch Operations Authority)</option>
+              <option value="ADMIN">ADMIN (Full System Administrator)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-initial-password">Initial Password</label>
+            <input type="text" id="add-initial-password" class="form-input" placeholder="Default: manager123 / employee123">
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="app.closeModals()">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Employee</button>
@@ -1105,6 +1120,14 @@
               <option value="TERMINATED">TERMINATED</option>
             </select>
           </div>
+        </div>
+        <div class="form-group" id="edit-system-role-wrap">
+          <label class="form-label" for="edit-system-role">System Access Role</label>
+          <select id="edit-system-role" class="select-custom" style="width: 100%;">
+            <option value="EMPLOYEE">EMPLOYEE (Standard Staff)</option>
+            <option value="MANAGER">MANAGER (Branch Operations Authority)</option>
+            <option value="ADMIN">ADMIN (Full System Administrator)</option>
+          </select>
         </div>
 
         <div class="modal-actions">

@@ -16,7 +16,8 @@ class EmployeeBase(BaseModel):
 
 
 class EmployeeCreate(EmployeeBase):
-    pass
+    system_role: Optional[str] = Field(None, description="System RBAC Role (EMPLOYEE, MANAGER, ADMIN)")
+    initial_password: Optional[str] = Field(None, description="Initial login password (defaults to manager123 or employee123)")
 
 
 class EmployeeUpdate(BaseModel):
@@ -27,6 +28,7 @@ class EmployeeUpdate(BaseModel):
     edoj: Optional[date] = None
     email: Optional[str] = None
     status: Optional[str] = None
+    system_role: Optional[str] = None
 
 
 class EmployeeResponse(EmployeeBase):
