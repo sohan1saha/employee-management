@@ -1198,6 +1198,21 @@ body {
 }
 
 /* =========================================================================
+   Attendance Widget Active State Enforcements
+   ========================================================================= */
+.attendance-widget-card.is-active-shift .btn-clock-in,
+.attendance-widget-card.is-shift-completed .btn-clock-in {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.attendance-widget-card.is-active-shift .btn-break-toggle,
+.attendance-widget-card.is-active-shift .btn-clock-out {
+  display: inline-flex !important;
+}
+
+/* =========================================================================
    Document Vault Cards
    ========================================================================= */
 .doc-card {

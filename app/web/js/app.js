@@ -1679,6 +1679,15 @@ class AppController {
 
   updateAttendanceWidgetState(summary) {
     this.currentAttendanceSummary = summary;
+    const cards = document.querySelectorAll('.attendance-widget-card');
+    const isClockedIn = !!(summary.is_currently_clocked_in && summary.today_record);
+    const isCompleted = !!(summary.today_record && summary.today_record.clock_out);
+
+    cards.forEach(c => {
+      c.classList.toggle('is-active-shift', isClockedIn);
+      c.classList.toggle('is-shift-completed', isCompleted);
+    });
+
     const badges = document.querySelectorAll('.attendance-status-badge, #emp-attendance-status-badge, #admin-attendance-status-badge');
     const punctBadges = document.querySelectorAll('.punctuality-badge, #emp-punctuality-badge, #admin-punctuality-badge');
     const otBadges = document.querySelectorAll('.overtime-badge, #emp-overtime-badge, #admin-overtime-badge');
@@ -1692,7 +1701,7 @@ class AppController {
     const progressBars = document.querySelectorAll('.shift-progress-bar, #emp-shift-bar, #admin-shift-bar');
     const progressPercents = document.querySelectorAll('.shift-progress-percent, #emp-shift-percent, #admin-shift-percent');
 
-    if (summary.is_currently_clocked_in && summary.today_record) {
+    if (isClockedIn) {
       const rec = summary.today_record;
       const clockInTime = this.parseUtcDate(rec.clock_in);
       const isOnBreak = summary.is_on_break;
@@ -1733,18 +1742,18 @@ class AppController {
         dt.innerText = `📍 IP: ${rec.ip_address || '127.0.0.1'} • ${rec.device_info || 'Web Browser'}`;
       });
 
-      // Buttons: Hide Clock In completely while active shift stopwatch is running
+      // Buttons: Force Hide Clock In completely while active shift stopwatch is running
       btnsIn.forEach(b => {
         b.disabled = true;
-        b.style.display = 'none';
+        b.style.setProperty('display', 'none', 'important');
       });
       btnsOut.forEach(b => {
         b.disabled = false;
-        b.style.display = 'inline-flex';
+        b.style.setProperty('display', 'inline-flex', 'important');
         b.innerText = '⏹ Clock Out';
       });
       btnsBreak.forEach(b => {
-        b.style.display = 'inline-flex';
+        b.style.setProperty('display', 'inline-flex', 'important');
         if (isOnBreak) {
           b.innerText = '▶ Resume Work';
           b.className = 'btn btn-primary btn-sm btn-break-toggle';
@@ -1776,14 +1785,14 @@ class AppController {
       otBadges.forEach(ob => ob.style.display = rec.status === 'OVERTIME' ? 'inline-flex' : 'none');
       btnsIn.forEach(b => {
         b.disabled = true;
-        b.style.display = 'none';
+        b.style.setProperty('display', 'none', 'important');
       });
       btnsOut.forEach(b => {
         b.disabled = true;
-        b.style.display = 'inline-flex';
+        b.style.setProperty('display', 'inline-flex', 'important');
         b.innerText = '✓ Shift Finalized';
       });
-      btnsBreak.forEach(b => b.style.display = 'none');
+      btnsBreak.forEach(b => b.style.setProperty('display', 'none', 'important'));
       breakLabels.forEach(bl => {
         const breakMins = Math.floor((rec.total_break_seconds || 0) / 60);
         if (breakMins > 0) {
@@ -1829,15 +1838,15 @@ class AppController {
       otBadges.forEach(ob => ob.style.display = 'none');
       btnsIn.forEach(b => {
         b.disabled = false;
-        b.style.display = 'inline-flex';
+        b.style.setProperty('display', 'inline-flex', 'important');
         b.innerText = '▶ Clock In';
       });
       btnsOut.forEach(b => {
         b.disabled = true;
-        b.style.display = 'none';
+        b.style.setProperty('display', 'none', 'important');
         b.innerText = '⏹ Clock Out';
       });
-      btnsBreak.forEach(b => b.style.display = 'none');
+      btnsBreak.forEach(b => b.style.setProperty('display', 'none', 'important'));
       breakLabels.forEach(bl => bl.style.display = 'none');
       detailsEls.forEach(d => d.innerText = 'Shift not started • General Shift (09:00 AM - 06:00 PM)');
       timers.forEach(t => {
