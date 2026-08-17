@@ -54,6 +54,15 @@ class Settings(BaseSettings):
         "192.168.0.0/16"
     ]
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: Optional[str]) -> str:
+        if not v:
+            return "sqlite:///./staffsync.db"
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
