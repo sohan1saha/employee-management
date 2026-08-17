@@ -27,19 +27,27 @@ def list_audit_logs(
     query = db.query(AuditLog)
 
     scoped_center = get_user_scope_center(db, current_user)
-    if scoped_center:
-        emp_ids = [str(e[0]) for e in db.query(Employee.eid).filter(Employee.ecen == scoped_center).all()]
-        target_patterns = [f"%#{eid}%" for eid in emp_ids]
-        target_filters = [AuditLog.target_entity.ilike(p) for p in target_patterns]
+    if scoped_center and current_user.role != "ADMIN":
+        center_emp_rows = db.query(Employee.eid, Employee.ename, Employee.email).filter(Employee.ecen == scoped_center).all()
+        center_emp_ids = [e[0] for e in center_emp_rows]
+        center_user_ids = [u[0] for u in db.query(User.id).filter(User.employee_id.in_(center_emp_ids)).all()] if center_emp_ids else []
+        center_usernames = [f"#{eid}" for eid in center_emp_ids] + [str(eid) for eid in center_emp_ids] + [e[2] for e in center_emp_rows if e[2]]
 
-        query = query.filter(
-            or_(
-                AuditLog.user_id == current_user.id,
-                AuditLog.new_value.ilike(f"%{scoped_center}%"),
-                AuditLog.old_value.ilike(f"%{scoped_center}%"),
-                *target_filters
-            )
-        )
+        target_filters = [AuditLog.target_entity.ilike(f"%#{eid}%") for eid in center_emp_ids]
+        
+        conditions = [
+            AuditLog.user_id == current_user.id,
+            AuditLog.new_value.ilike(f"%{scoped_center}%"),
+            AuditLog.old_value.ilike(f"%{scoped_center}%"),
+        ]
+        if center_user_ids:
+            conditions.append(AuditLog.user_id.in_(center_user_ids))
+        if center_usernames:
+            conditions.append(AuditLog.username.in_(center_usernames))
+        if target_filters:
+            conditions.extend(target_filters)
+
+        query = query.filter(or_(*conditions))
 
     if action and action != "ALL":
         query = query.filter(AuditLog.action.ilike(f"%{action}%"))

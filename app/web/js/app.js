@@ -307,7 +307,9 @@ class AppController {
       leaves: api.user?.role === 'EMPLOYEE' ? 'My Leaves & PTO' : 'Leaves & PTO',
       performance: api.user?.role === 'EMPLOYEE' ? 'My Performance' : 'Performance & Appraisals',
       documents: api.user?.role === 'EMPLOYEE' ? 'My Documents' : 'Document Vault',
-      audit: 'Audit Trail'
+      audit: api.user?.role === 'MANAGER' && this.availableCenters?.length === 1
+        ? `${this.availableCenters[0]} Center Audit Trail`
+        : 'Audit Trail'
     };
 
     const titleEl = document.getElementById('page-title');
@@ -1581,10 +1583,12 @@ class AppController {
       if (!tbody) return;
 
       if (logs.length === 0) {
+        const isMgr = api.user?.role === 'MANAGER';
+        const centerName = this.availableCenters?.[0] || 'your assigned branch';
         tbody.innerHTML = this.renderEmptyState(
           '🛡️',
           'Audit Log is Empty',
-          'Append-only system security logs will appear as operations are executed.'
+          isMgr ? `No security audit events recorded yet for employees in ${centerName}.` : 'Append-only system security logs will appear as operations are executed.'
         );
         return;
       }
