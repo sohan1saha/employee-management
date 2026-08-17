@@ -1733,9 +1733,16 @@ class AppController {
         dt.innerText = `📍 IP: ${rec.ip_address || '127.0.0.1'} • ${rec.device_info || 'Web Browser'}`;
       });
 
-      // Buttons
-      btnsIn.forEach(b => b.disabled = true);
-      btnsOut.forEach(b => b.disabled = false);
+      // Buttons: Hide Clock In completely while active shift stopwatch is running
+      btnsIn.forEach(b => {
+        b.disabled = true;
+        b.style.display = 'none';
+      });
+      btnsOut.forEach(b => {
+        b.disabled = false;
+        b.style.display = 'inline-flex';
+        b.innerText = '⏹ Clock Out';
+      });
       btnsBreak.forEach(b => {
         b.style.display = 'inline-flex';
         if (isOnBreak) {
@@ -1767,8 +1774,15 @@ class AppController {
       });
       punctBadges.forEach(pb => pb.style.display = 'none');
       otBadges.forEach(ob => ob.style.display = rec.status === 'OVERTIME' ? 'inline-flex' : 'none');
-      btnsIn.forEach(b => b.disabled = false);
-      btnsOut.forEach(b => b.disabled = true);
+      btnsIn.forEach(b => {
+        b.disabled = true;
+        b.style.display = 'none';
+      });
+      btnsOut.forEach(b => {
+        b.disabled = true;
+        b.style.display = 'inline-flex';
+        b.innerText = '✓ Shift Finalized';
+      });
       btnsBreak.forEach(b => b.style.display = 'none');
       breakLabels.forEach(bl => {
         const breakMins = Math.floor((rec.total_break_seconds || 0) / 60);
@@ -1813,8 +1827,16 @@ class AppController {
       });
       punctBadges.forEach(pb => pb.style.display = 'none');
       otBadges.forEach(ob => ob.style.display = 'none');
-      btnsIn.forEach(b => b.disabled = false);
-      btnsOut.forEach(b => b.disabled = true);
+      btnsIn.forEach(b => {
+        b.disabled = false;
+        b.style.display = 'inline-flex';
+        b.innerText = '▶ Clock In';
+      });
+      btnsOut.forEach(b => {
+        b.disabled = true;
+        b.style.display = 'none';
+        b.innerText = '⏹ Clock Out';
+      });
       btnsBreak.forEach(b => b.style.display = 'none');
       breakLabels.forEach(bl => bl.style.display = 'none');
       detailsEls.forEach(d => d.innerText = 'Shift not started • General Shift (09:00 AM - 06:00 PM)');
@@ -1922,6 +1944,12 @@ class AppController {
   }
 
   async handleClockIn() {
+    const btnsIn = document.querySelectorAll('.btn-clock-in, #btn-emp-clock-in');
+    btnsIn.forEach(b => {
+      b.disabled = true;
+      b.innerText = '⏳ Clocking In...';
+    });
+
     try {
       const deviceInfo = this.getBrowserAndDeviceInfo();
       const res = await api.clockIn('', deviceInfo);
@@ -1961,6 +1989,11 @@ class AppController {
       this.showToast('Successfully clocked in! Work stopwatch started.', 'success');
       await this.loadAttendanceData();
     } catch (err) {
+      btnsIn.forEach(b => {
+        b.disabled = false;
+        b.style.display = 'inline-flex';
+        b.innerText = '▶ Clock In';
+      });
       this.showToast(err.message || 'Clock in failed', 'error');
     }
   }

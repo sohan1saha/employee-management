@@ -678,6 +678,15 @@ body {
   border-radius: var(--radius-sm);
 }
 
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .btn-plus-icon {
   color: #facc15;
   font-size: 1.25rem;
