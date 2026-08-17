@@ -38,10 +38,8 @@ logging.basicConfig(
 logger = logging.getLogger("staffsync.main")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Ensure schema tables and initial seed data exist for zero-touch cloud deployment."""
-    logger.info("Application starting: Initializing schema and verifying seed records...")
+def init_db_sync():
+    """Synchronous schema and seed verification runner."""
     try:
         from app.core.database import Base, engine, SessionLocal
         import app.models  # Register all models
@@ -55,8 +53,17 @@ async def lifespan(app: FastAPI):
             from seed_data import seed_database
             seed_database(reset=False)
         db.close()
+        logger.info("Database schema and seed records successfully verified.")
     except Exception as e:
         logger.error(f"Startup database initialization error: {e}", exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure schema tables and initial seed data exist for zero-touch cloud deployment."""
+    logger.info("Application starting: Initializing database schema in background thread...")
+    import asyncio
+    asyncio.create_task(asyncio.to_thread(init_db_sync))
     yield
 
 
