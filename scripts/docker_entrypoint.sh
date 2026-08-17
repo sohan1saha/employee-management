@@ -4,8 +4,5 @@
 # ==============================================================================
 set -e
 
-echo "[+] StaffSync 360: Checking database migrations..."
-alembic upgrade head || echo "[!] Database migrations initialized via lifespan."
-
-echo "[+] StaffSync 360: Starting application server..."
+echo "[+] Apex HRMS: Starting application server..."
 exec python main.py
