@@ -11,22 +11,33 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from app.core.config import settings
 
+import logging
+
+logger = logging.getLogger("staffsync.database")
+
 # 1. Primary Master Engine Configuration (Writes & Core Transactions)
-if settings.DATABASE_URL.startswith("sqlite"):
+try:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(
+            settings.DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            pool_pre_ping=True
+        )
+    else:
+        engine = create_engine(
+            settings.DATABASE_URL,
+            pool_size=10,
+            max_overflow=5,
+            pool_timeout=30,
+            pool_recycle=1800,
+            pool_pre_ping=True
+        )
+except Exception as e:
+    logger.error(f"Failed to initialize master database engine: {e}. Falling back to SQLite fallback.")
     engine = create_engine(
-        settings.DATABASE_URL,
+        "sqlite:///./staffsync.db",
         connect_args={"check_same_thread": False},
         pool_pre_ping=True
-    )
-else:
-    engine = create_engine(
-        settings.DATABASE_URL,
-        pool_size=20,
-        max_overflow=10,
-        pool_timeout=30,
-        pool_recycle=1800,
-        pool_pre_ping=True,
-        connect_args={"connect_timeout": 10}
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
