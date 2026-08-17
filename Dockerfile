@@ -48,16 +48,11 @@ COPY --from=builder /root/.local /home/appuser/.local
 COPY --chown=appuser:appgroup . .
 
 # Set permissions
-RUN chown -R appuser:appgroup /app && \
-    chmod +x /app/scripts/docker_entrypoint.sh
+RUN chown -R appuser:appgroup /app
 
 USER appuser
 
-EXPOSE 8000 8080
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/healthz || exit 0
-
-# Production entrypoint running automated Alembic migrations and Uvicorn
-ENTRYPOINT ["/app/scripts/docker_entrypoint.sh"]
+# Direct application entrypoint
+CMD ["python", "main.py"]
