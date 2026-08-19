@@ -21,21 +21,96 @@ class AppController {
   // Authentication & Session
   // =========================================================================
   checkAuth() {
-    if (api.token && api.user) {
+    if (api.isSessionValid()) {
       this.showAppLayout();
+      this.startSessionCountdown();
     } else {
-      this.showLoginOverlay();
+      const hadToken = !!api.token;
+      api.clearSession();
+      this.showLoginOverlay(hadToken);
     }
   }
 
-  showLoginOverlay() {
+  showLoginOverlay(isExpired = false) {
+    if (this.sessionInterval) {
+      clearInterval(this.sessionInterval);
+      this.sessionInterval = null;
+    }
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('app-container').style.display = 'none';
+
     const empInput = document.getElementById('login-employee-id');
     const pwdInput = document.getElementById('login-password');
-    if (empInput) empInput.value = '';
+    const rememberCheckbox = document.getElementById('login-remember-me');
+    const rememberedId = localStorage.getItem('apex_remembered_employee_id');
+
     if (pwdInput) pwdInput.value = '';
-    if (empInput) empInput.focus();
+
+    if (rememberedId) {
+      if (empInput) empInput.value = rememberedId;
+      if (rememberCheckbox) rememberCheckbox.checked = true;
+      if (pwdInput) pwdInput.focus();
+    } else {
+      if (empInput) empInput.value = '';
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      if (empInput) empInput.focus();
+    }
+
+    if (isExpired) {
+      this.showToast('⏰ Session Expired: Your 1-hour login window has ended. Please sign in again.', 'warning');
+    }
+  }
+
+  startSessionCountdown() {
+    if (this.sessionInterval) clearInterval(this.sessionInterval);
+
+    const updateTimer = () => {
+      const remainingMs = api.getSessionRemainingMs();
+      if (remainingMs <= 0) {
+        clearInterval(this.sessionInterval);
+        this.sessionInterval = null;
+        this.handleAutoLogout('⏰ 1-hour session limit reached. You have been automatically logged out for security.');
+        return;
+      }
+
+      const totalSec = Math.floor(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      const formattedMinSec = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+      const topCountdown = document.getElementById('top-session-countdown');
+      const topPill = document.getElementById('top-session-pill');
+      const sideRemaining = document.getElementById('session-time-remaining');
+
+      if (topCountdown) topCountdown.innerText = formattedMinSec;
+      if (sideRemaining) sideRemaining.innerText = `${mins}m left`;
+
+      // Highlight warning when less than 5 minutes remain
+      if (mins < 5) {
+        if (topCountdown) topCountdown.style.color = '#fbbf24';
+        if (topPill) topPill.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+        if (sideRemaining) sideRemaining.style.color = '#fbbf24';
+      } else {
+        if (topCountdown) topCountdown.style.color = '#34d399';
+        if (topPill) topPill.style.borderColor = 'rgba(99, 102, 241, 0.25)';
+        if (sideRemaining) sideRemaining.style.color = '#34d399';
+      }
+    };
+
+    updateTimer();
+    this.sessionInterval = setInterval(updateTimer, 1000);
+  }
+
+  handleAutoLogout(reason) {
+    if (this.sessionInterval) {
+      clearInterval(this.sessionInterval);
+      this.sessionInterval = null;
+    }
+    api.clearSession();
+    this.showLoginOverlay(true);
+    if (reason) {
+      this.showToast(reason, 'warning');
+    }
   }
 
   showAppLayout() {
@@ -147,32 +222,61 @@ class AppController {
   }
 
   bindEvents() {
+    // Session expiration and unauthorized event listeners
+    window.addEventListener('auth:session_expired', (e) => {
+      this.handleAutoLogout(e.detail?.reason || 'Session expired. Please sign in again.');
+    });
+
+    window.addEventListener('auth:unauthorized', () => {
+      this.handleAutoLogout('Authentication required. Please sign in again.');
+    });
+
     // Login form submission
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const empInput = document.getElementById('login-employee-id');
       const pwdInput = document.getElementById('login-password');
+      const rememberCheckbox = document.getElementById('login-remember-me');
       const empId = empInput.value.trim();
       const p = pwdInput.value;
+      const rememberMe = rememberCheckbox ? rememberCheckbox.checked : false;
+
       try {
-        await api.login(empId, p);
-        this.showToast('Logged in successfully!', 'success');
-        empInput.value = '';
+        await api.login(empId, p, rememberMe);
+        
+        // Persist or clean up Remember Me credentials
+        if (rememberMe) {
+          localStorage.setItem('apex_remembered_employee_id', empId);
+          localStorage.setItem('apex_remember_me', 'true');
+        } else {
+          localStorage.removeItem('apex_remembered_employee_id');
+          localStorage.removeItem('apex_remember_me');
+        }
+
+        this.showToast('Logged in successfully! 1-hour session active.', 'success');
         pwdInput.value = '';
         this.showAppLayout();
+        this.startSessionCountdown();
       } catch (err) {
         this.showToast(err.message || 'Login failed. Invalid credentials.', 'error');
-        // Clear previous entries from boxes on failed attempt and refocus
-        empInput.value = '';
         pwdInput.value = '';
-        empInput.focus();
+        if (!rememberMe) {
+          empInput.value = '';
+          empInput.focus();
+        } else {
+          pwdInput.focus();
+        }
       }
     });
 
     // Logout
     document.getElementById('btn-logout').addEventListener('click', async () => {
+      if (this.sessionInterval) {
+        clearInterval(this.sessionInterval);
+        this.sessionInterval = null;
+      }
       await api.logout();
-      this.showLoginOverlay();
+      this.showLoginOverlay(false);
       this.showToast('Signed out successfully.', 'info');
     });
 

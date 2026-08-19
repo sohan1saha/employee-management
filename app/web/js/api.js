@@ -13,12 +13,24 @@ class ApiClient {
     this.token = localStorage.getItem('access_token') || null;
     this.refreshToken = localStorage.getItem('refresh_token') || null;
     this.user = JSON.parse(localStorage.getItem('user_info') || 'null');
+    this.sessionExpiresAt = parseInt(localStorage.getItem('apex_session_expires_at') || '0', 10);
     this.isRefreshing = false;
     this.refreshSubscribers = [];
     this.baseUrl = API_BASE;
   }
 
-  setSession(accessToken, refreshToken, user) {
+  isSessionValid() {
+    if (!this.token || !this.user) return false;
+    if (this.sessionExpiresAt && Date.now() >= this.sessionExpiresAt) return false;
+    return true;
+  }
+
+  getSessionRemainingMs() {
+    if (!this.sessionExpiresAt) return 0;
+    return Math.max(0, this.sessionExpiresAt - Date.now());
+  }
+
+  setSession(accessToken, refreshToken, user, expiresInMinutes = 60) {
     this.token = accessToken;
     if (refreshToken) {
       this.refreshToken = refreshToken;
@@ -27,15 +39,24 @@ class ApiClient {
     this.user = user;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('user_info', JSON.stringify(user));
+    
+    // Set 1-hour strict session expiry timestamp
+    const expiresAt = Date.now() + (expiresInMinutes * 60 * 1000);
+    this.sessionExpiresAt = expiresAt;
+    localStorage.setItem('apex_session_expires_at', expiresAt.toString());
+    localStorage.setItem('apex_session_started_at', Date.now().toString());
   }
 
   clearSession() {
     this.token = null;
     this.refreshToken = null;
     this.user = null;
+    this.sessionExpiresAt = 0;
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_info');
+    localStorage.removeItem('apex_session_expires_at');
+    localStorage.removeItem('apex_session_started_at');
   }
 
   onRefreshed(token) {
@@ -48,6 +69,15 @@ class ApiClient {
   }
 
   async refreshAccessToken() {
+    // If the 1-hour session window has expired, refuse refresh and force credential login
+    if (this.sessionExpiresAt && Date.now() >= this.sessionExpiresAt) {
+      this.clearSession();
+      window.dispatchEvent(new CustomEvent('auth:session_expired', {
+        detail: { reason: 'Your 1-hour login window has ended. Please sign in again.' }
+      }));
+      throw new Error('Session expired (1-hour limit reached). Please sign in again.');
+    }
+
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
@@ -61,7 +91,7 @@ class ApiClient {
       }
 
       const data = await response.json();
-      this.setSession(data.access_token, data.refresh_token, data.user);
+      this.setSession(data.access_token, data.refresh_token, data.user, data.expires_in_minutes || 60);
       return data.access_token;
     } catch (err) {
       this.clearSession();
@@ -71,6 +101,15 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}, isRetry = false) {
+    // Check 1-hour session expiration before sending request
+    if (this.token && this.sessionExpiresAt && Date.now() >= this.sessionExpiresAt) {
+      this.clearSession();
+      window.dispatchEvent(new CustomEvent('auth:session_expired', {
+        detail: { reason: 'Your 1-hour login window has ended. Please sign in again.' }
+      }));
+      throw new Error('Session expired (1-hour limit reached). Please sign in again.');
+    }
+
     const url = `${API_BASE}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
@@ -88,20 +127,22 @@ class ApiClient {
         credentials: 'include' // Sends HttpOnly / SameSite secure cookies
       });
 
-      // Handle 401 Unauthorized with automatic silent token refresh
+      // Handle 401 Unauthorized
       if (response.status === 401) {
         if (endpoint.startsWith('/auth/login')) {
           const errData = await response.json().catch(() => ({}));
           throw new Error(errData.detail || 'Incorrect Employee ID or password');
         }
 
-        if (endpoint.startsWith('/auth/refresh') || isRetry) {
+        if (endpoint.startsWith('/auth/refresh') || isRetry || (this.sessionExpiresAt && Date.now() >= this.sessionExpiresAt)) {
           this.clearSession();
-          window.dispatchEvent(new Event('auth:unauthorized'));
+          window.dispatchEvent(new CustomEvent('auth:session_expired', {
+            detail: { reason: 'Session expired. Please sign in again.' }
+          }));
           throw new Error('Session expired. Please sign in again.');
         }
 
-        // Silent token refresh flow
+        // Silent token refresh flow if within the 1-hour window
         if (!this.isRefreshing) {
           this.isRefreshing = true;
           try {
@@ -145,12 +186,17 @@ class ApiClient {
   }
 
   // --- Auth Endpoints ---
-  async login(employee_id, password) {
+  async login(employee_id, password, remember_me = false) {
     const res = await this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: parseInt(employee_id), password })
+      body: JSON.stringify({
+        employee_id: parseInt(employee_id),
+        password,
+        remember_me: !!remember_me
+      })
     });
-    this.setSession(res.access_token, res.refresh_token, res.user);
+    const expireMins = res.expires_in_minutes || 60;
+    this.setSession(res.access_token, res.refresh_token, res.user, expireMins);
     return res;
   }
 

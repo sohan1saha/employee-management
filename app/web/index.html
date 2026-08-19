@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=2.2.5">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.3.0">
   <script src="/static/js/chart.min.js"></script>
   <script>
     if (typeof Chart === 'undefined') {
@@ -81,7 +81,16 @@
             <button type="button" id="btn-toggle-password" class="password-toggle-btn" onclick="app.togglePasswordVisibility('login-password', 'btn-toggle-password')">Show</button>
           </div>
         </div>
-        <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: -4px; margin-bottom: 14px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="login-remember-me" style="accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; border-radius: 4px;">
+            <span>Remember Me</span>
+          </label>
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;" title="Every active login session is securely capped at 1 hour">
+            ⏱️ 1h Session Window
+          </span>
+        </div>
+        <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 4px;">
           Sign In to Dashboard
         </button>
       </form>
@@ -181,7 +190,12 @@
               <div class="user-avatar" id="sidebar-user-avatar">A</div>
               <div>
                 <div class="user-name" id="sidebar-user-name">Admin User</div>
-                <div class="user-role-badge" id="sidebar-user-role">ADMIN</div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
+                  <span class="user-role-badge" id="sidebar-user-role">ADMIN</span>
+                  <span id="sidebar-session-timer" style="font-size: 0.7rem; color: #34d399; display: inline-flex; align-items: center; gap: 3px;" title="1-Hour Secure Login Window">
+                    ⏳ <span id="session-time-remaining">60m left</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -224,6 +238,12 @@
         </div>
 
         <div class="top-actions">
+          <!-- Live Session Expiry Window Badge -->
+          <div class="session-timer-pill" id="top-session-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); padding: 5px 12px; border-radius: 9999px; font-size: 0.76rem; color: #93c5fd;" title="Active session window (Auto-logout after 1 hour)">
+            <span style="font-size: 0.82rem;">⏳</span>
+            <span id="top-session-countdown" style="font-family: monospace; font-weight: 700; color: #34d399;">60:00</span>
+          </div>
+
           <!-- Notification Bell Component -->
           <div class="notification-bell-wrap" id="notification-bell-wrap">
             <button type="button" class="btn-icon-bell" id="btn-notification-bell" onclick="app.toggleNotificationDropdown()" title="System Notifications">
@@ -1498,7 +1518,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="/static/js/api.js?v=2.2.5"></script>
-  <script src="/static/js/app.js?v=2.2.5"></script>
+  <script src="/static/js/api.js?v=2.3.0"></script>
+  <script src="/static/js/app.js?v=2.3.0"></script>
 </body>
 </html>

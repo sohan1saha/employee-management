@@ -154,6 +154,7 @@ def login(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        "session_timeout_seconds": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user": user.to_dict()
     }
 

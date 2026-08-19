@@ -16,6 +16,7 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     employee_id: int
     password: str
+    remember_me: Optional[bool] = False
 
 
 class PasswordChangeRequest(BaseModel):
@@ -32,7 +33,8 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
-    expires_in_minutes: int = 15
+    expires_in_minutes: int = 60
+    session_timeout_seconds: int = 3600
     user: dict
 
 
